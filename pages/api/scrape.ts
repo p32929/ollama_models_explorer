@@ -2,6 +2,16 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 import axios from 'axios';
 import * as cheerio from 'cheerio';
 
+interface ModelVersion {
+  name: string;
+  size: string;
+  context: string;
+  input: string;
+  updated: string;
+  isLatest?: boolean;
+  url: string;
+}
+
 interface ModelData {
   name: string;
   url: string;
@@ -10,6 +20,77 @@ interface ModelData {
   pulls: string;
   tags: string;
   updated: string;
+  versions: ModelVersion[];
+}
+
+async function fetchModelDetails(url: string): Promise<ModelVersion[]> {
+  try {
+    const { data } = await axios.get(`https://ollama.com${url}`);
+    const $ = cheerio.load(data);
+    const versions: ModelVersion[] = [];
+
+    // Process both mobile and desktop views
+    $('a[href^="/library/"]').each((_, element) => {
+      const $el = $(element);
+      const href = $el.attr('href');
+      
+      // Skip if not a model version link
+      if (!href || !href.includes(':')) return;
+
+      // For mobile view
+      if ($el.hasClass('sm:hidden')) {
+        const name = $el.find('p.font-medium').first().text().trim();
+        const infoText = $el.find('p.text-neutral-500').first().text().trim().split('·').map(s => s.trim());
+        
+        if (infoText.length >= 3) {
+          versions.push({
+            name,
+            size: infoText[0],
+            context: infoText[1].replace('context window', '').trim(),
+            input: infoText[2],
+            updated: infoText[3] || '',
+            isLatest: $el.find('span.border-blue-500').length > 0,
+            url: `https://ollama.com${href}`
+          });
+        }
+      }
+      // For desktop view
+      else if ($el.closest('div.hidden.sm:grid').length > 0) {
+        const $row = $el.closest('div.hidden.sm:grid');
+        const name = $row.find('a[href^="/library/"]').first().text().trim();
+        const cells = $row.find('p.text-neutral-500');
+        
+        if (cells.length >= 3) {
+          // Try to find the updated time in the row
+          let updated = '';
+          const updatedEl = $row.find('span[x-test-updated]');
+          if (updatedEl.length) {
+            updated = updatedEl.text().trim();
+          }
+          
+          versions.push({
+            name,
+            size: cells.eq(0).text().trim(),
+            context: cells.eq(1).text().trim(),
+            input: cells.eq(2).text().trim(),
+            updated,
+            isLatest: $row.find('span.border-blue-500').length > 0,
+            url: `https://ollama.com${href}`
+          });
+        }
+      }
+    });
+
+    // Remove duplicates by name
+    const uniqueVersions = versions.filter((v, i, self) => 
+      i === self.findIndex(t => t.name === v.name)
+    );
+
+    return uniqueVersions;
+  } catch (error) {
+    console.error(`Error fetching model details from ${url}:`, error);
+    return [];
+  }
 }
 
 export default async function handler(
@@ -54,7 +135,7 @@ export default async function handler(
       // Extract last updated time
       const updated = $el.find('[x-test-updated]').text().trim();
       
-      // Add model data to array
+      // Add model data to array (fetch details in parallel for better performance)
       models.push({
         name,
         url: `https://ollama.com${url}`, // Convert to full URL
@@ -62,12 +143,22 @@ export default async function handler(
         capabilities,
         pulls,
         tags,
-        updated
+        updated,
+        versions: [] // Will be populated after all models are collected
       });
     });
     
-    // Return the models data in the response
-    res.status(200).json({ models });
+    // Fetch details for all models in parallel
+    const modelsWithDetails = await Promise.all(models.map(async (model) => {
+      const versions = await fetchModelDetails(model.url.replace('https://ollama.com', ''));
+      return {
+        ...model,
+        versions
+      };
+    }));
+    
+    // Return the models data with details in the response
+    res.status(200).json({ models: modelsWithDetails });
   } catch (error) {
     console.error('Error scraping website:', error);
     res.status(500).json({ error: 'Failed to scrape website' });
