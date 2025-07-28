@@ -17,7 +17,8 @@ import {
   ImageIcon, 
   MessagesSquare,
   Sparkles,
-  Database
+  Database,
+  Github
 } from 'lucide-react';
 
 // Detailed type definitions for strong typing
@@ -357,6 +358,14 @@ export default function Home() {
     <div className="min-h-screen bg-black text-white">
       <div className="container mx-auto px-4 py-3">
         <div className="w-full mx-auto">
+          {/* GitHub Link */}
+          <div className="text-center text-sm mb-3">
+            <a href="https://github.com/p32929/ollama_models_explorer" target="_blank" rel="noopener noreferrer" className="inline-flex items-center text-zinc-400 hover:text-white transition-colors">
+              <Github className="h-4 w-4 mr-1" />
+              <span>GitHub Repository</span>
+            </a>
+          </div>
+          
           {/* Search */}
           <div className="mb-2">
             
