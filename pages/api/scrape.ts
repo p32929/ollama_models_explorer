@@ -4,6 +4,7 @@ import * as cheerio from 'cheerio';
 
 interface ModelData {
   name: string;
+  url: string;
   description: string;
   capabilities: string[];
   pulls: string;
@@ -32,6 +33,9 @@ export default async function handler(
       // Extract model name
       const name = $el.find('[x-test-search-response-title]').text().trim();
       
+      // Extract URL
+      const url = $el.find('a').attr('href') || '';
+      
       // Extract description
       const description = $el.find('p:not([class*="space-x-5"])').first().text().trim();
       
@@ -53,6 +57,7 @@ export default async function handler(
       // Add model data to array
       models.push({
         name,
+        url: `https://ollama.com${url}`, // Convert to full URL
         description,
         capabilities,
         pulls,
