@@ -2,6 +2,8 @@
 
 A modern, dark-themed UI for exploring and filtering Ollama AI models. This Next.js application provides an efficient interface to browse, search, and sort through a collection of AI models with multiple filtering options.
 
+<img width="3024" height="1714" alt="Image" src="https://github.com/user-attachments/assets/48895735-134b-4410-a52d-921fab587dc1" />
+
 ## Features
 
 - 🌑 **Dark-themed UI** - Clean, modern interface with a dark color scheme
