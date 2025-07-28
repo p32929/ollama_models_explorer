@@ -16,7 +16,8 @@ import {
   Clock, 
   ImageIcon, 
   MessagesSquare,
-  Sparkles
+  Sparkles,
+  Database
 } from 'lucide-react';
 
 // Detailed type definitions for strong typing
@@ -262,57 +263,59 @@ export default function Home() {
   // Loading state
   if (initialLoading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-900 to-slate-800 text-white">
+      <div className="min-h-screen bg-black text-white">
         <div className="container mx-auto px-6 py-16">
           <div className="w-full mx-auto">
             {/* Simple loading UI */}
             <div className="text-center mb-12">
-              <div className="h-12 w-64 bg-slate-700/50 mx-auto mb-4 rounded animate-pulse"></div>
-              <div className="h-6 w-96 max-w-full bg-slate-700/30 mx-auto mb-8 rounded animate-pulse"></div>
-              <div className="h-14 w-full max-w-md bg-slate-700/50 mx-auto rounded-lg animate-pulse"></div>
+              <div className="h-12 w-64 bg-zinc-800/50 mx-auto mb-4 rounded animate-pulse"></div>
+              <div className="h-6 w-96 max-w-full bg-zinc-800/30 mx-auto mb-8 rounded animate-pulse"></div>
+              <div className="h-14 w-full max-w-md bg-zinc-800/50 mx-auto rounded-lg animate-pulse"></div>
               <div className="mt-8 flex flex-wrap justify-center gap-2">
                 {[1, 2, 3, 4, 5].map(i => (
-                  <div key={i} className="h-8 w-20 bg-slate-700/40 rounded-full animate-pulse"></div>
+                  <div key={i} className="h-8 w-20 bg-zinc-800/40 rounded-full animate-pulse"></div>
                 ))}
               </div>
             </div>
             
             {/* Table loading */}
-            <div className="overflow-hidden bg-slate-800/50 border border-slate-700 rounded-lg">
+            <div className="overflow-hidden bg-zinc-900 border border-zinc-800 rounded-lg shadow-xl">
               <div className="overflow-x-auto">
                 <Table>
                   <TableHeader>
-                    <TableRow className="border-slate-700/50 hover:bg-transparent">
+                    <TableRow className="border-zinc-800 hover:bg-transparent bg-zinc-950">
                       {["Model", "Capabilities", "Versions", "Size", "Context", "Link"].map((header, i) => (
-                        <TableHead key={i} className="h-12 text-slate-300">
-                          <div className="h-5 w-20 bg-slate-700/40 rounded animate-pulse"></div>
+                        <TableHead key={i} className="cursor-pointer py-4 text-zinc-300 font-medium hover:text-violet-400 transition-colors">
+                          <div className="flex items-center">
+                            <span>{header}</span>
+                          </div>
                         </TableHead>
                       ))}
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {Array(5).fill(0).map((_, i) => (
-                      <TableRow key={i} className="border-slate-700/30 hover:bg-slate-800/30">
-                        <TableCell className="py-3">
-                          <div className="h-5 w-32 bg-slate-700/30 rounded animate-pulse"></div>
+                      <TableRow key={i} className="border-zinc-800 hover:bg-zinc-800/50 transition-colors">
+                        <TableCell className="py-2.5">
+                          <div className="h-6 w-32 rounded bg-zinc-800/60 animate-pulse"></div>
                         </TableCell>
-                        <TableCell className="py-3">
-                          <div className="flex gap-1">
-                            <div className="h-6 w-16 rounded-full bg-slate-700/30 animate-pulse"></div>
-                            <div className="h-6 w-16 rounded-full bg-slate-700/30 animate-pulse"></div>
+                        <TableCell className="py-2.5">
+                          <div className="flex gap-1.5">
+                            <div className="h-5 w-16 rounded-full bg-zinc-800/60 animate-pulse"></div>
+                            <div className="h-5 w-16 rounded-full bg-zinc-800/60 animate-pulse"></div>
                           </div>
                         </TableCell>
-                        <TableCell className="py-3">
-                          <div className="h-5 w-12 bg-slate-700/30 rounded animate-pulse"></div>
+                        <TableCell className="py-2.5">
+                          <div className="h-5 w-12 bg-zinc-800/60 rounded animate-pulse"></div>
                         </TableCell>
-                        <TableCell className="py-3">
-                          <div className="h-5 w-20 bg-slate-700/30 rounded animate-pulse"></div>
+                        <TableCell className="py-2.5">
+                          <div className="h-5 w-20 bg-zinc-800/60 rounded animate-pulse"></div>
                         </TableCell>
-                        <TableCell className="py-3">
-                          <div className="h-5 w-16 bg-slate-700/30 rounded animate-pulse"></div>
+                        <TableCell className="py-2.5">
+                          <div className="h-5 w-16 bg-zinc-800/60 rounded animate-pulse"></div>
                         </TableCell>
-                        <TableCell className="py-3">
-                          <div className="h-8 w-8 rounded-full bg-slate-700/30 animate-pulse"></div>
+                        <TableCell className="py-2.5 text-right">
+                          <div className="h-7 w-7 rounded-full bg-zinc-800/60 animate-pulse ml-auto"></div>
                         </TableCell>
                       </TableRow>
                     ))}
@@ -351,39 +354,31 @@ export default function Home() {
 
   // Main UI
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 to-slate-800 text-white">
-      <div className="w-full px-4 py-8">
+    <div className="min-h-screen bg-black text-white">
+      <div className="container mx-auto px-4 py-3">
         <div className="w-full mx-auto">
-          {/* Header & Search */}
-          <div className="mb-6">
-            <div className="text-center mb-5">
-              <h1 className="text-3xl md:text-4xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-blue-400 to-violet-400 inline-block mb-2">
-                Ollama Models Explorer
-              </h1>
-              <p className="text-base md:text-lg text-slate-300 max-w-2xl mx-auto">
-                Discover and explore {models.length} AI models with detailed specifications
-              </p>
-            </div>
+          {/* Search */}
+          <div className="mb-2">
             
-            <div className="w-full max-w-lg mx-auto relative mb-5">
-              <div className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400">
+            <div className="w-full max-w-xl mx-auto relative mb-2">
+              <div className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-500">
                 <Search className="h-5 w-5" />
               </div>
               <Input
-                placeholder="Search models, capabilities or try 'smallest', 'largest context', 'latest'..."
+                placeholder="Search models..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-10 h-10 text-base border-slate-600 bg-slate-800/60 text-white rounded-lg shadow-lg shadow-slate-900/20 ring-offset-slate-900 focus-visible:ring-blue-500"
+                className="pl-12 h-9 text-sm bg-zinc-900 border-zinc-800 text-white rounded-md shadow-lg focus-visible:ring-1 focus-visible:ring-white focus-visible:border-transparent"
               />
             </div>
             
             {/* Capability filters */}
-            <div className="flex flex-wrap items-center justify-center gap-2 mb-4">
+            <div className="flex flex-wrap items-center justify-center gap-1.5 mb-2">
               <Button
                 variant={activeCapabilityFilter === null ? "secondary" : "outline"}
                 size="sm"
                 onClick={() => setActiveCapabilityFilter(null)}
-                className="rounded-full text-sm font-medium px-4"
+                className={`rounded-full text-xs font-medium px-3 py-0.5 h-7 ${activeCapabilityFilter === null ? 'bg-zinc-700 hover:bg-zinc-600 text-white' : 'bg-transparent border-zinc-700 text-zinc-300 hover:bg-zinc-900 hover:text-white'}`}
               >
                 All
               </Button>
@@ -393,7 +388,7 @@ export default function Home() {
                   variant={activeCapabilityFilter === capability ? "secondary" : "outline"}
                   size="sm"
                   onClick={() => setActiveCapabilityFilter(capability === activeCapabilityFilter ? null : capability)}
-                  className="rounded-full text-sm font-medium gap-1.5 px-4"
+                  className={`rounded-full text-xs font-medium gap-1 px-3 py-0.5 h-7 ${activeCapabilityFilter === capability ? 'bg-zinc-700 hover:bg-zinc-600 text-white' : 'bg-transparent border-zinc-700 text-zinc-300 hover:bg-zinc-900 hover:text-white'}`}
                 >
                   {getCapabilityIcon(capability)}
                   <span className="capitalize">{capability}</span>
@@ -402,86 +397,84 @@ export default function Home() {
             </div>
             
             {/* Stats */}
-            <div className="text-center text-sm text-slate-400">
+            <div className="text-center text-xs text-zinc-500 mb-1">
               Showing {filteredAndSortedModels.length} of {models.length} models
               {activeCapabilityFilter && (
-                <span> • Filtered by <span className="text-blue-400 capitalize">{activeCapabilityFilter}</span></span>
+                <span> • Filtered by <span className="text-white capitalize">{activeCapabilityFilter}</span></span>
               )}
             </div>
           </div>
 
           {/* Table */}
           {filteredAndSortedModels.length > 0 ? (
-            <div className="overflow-hidden bg-slate-800/50 border border-slate-700 rounded-lg shadow-lg w-full">
+            <div className="overflow-hidden bg-zinc-900 border border-zinc-800 rounded-lg shadow-xl">
               <div className="overflow-x-auto">
                 <Table>
                   <TableHeader>
-                    <TableRow className="border-slate-700/50 hover:bg-transparent">
-                      <TableHead className="py-4 text-slate-300">
-                        <Button 
-                          variant="ghost" 
-                          onClick={() => handleSort('name')}
-                          className="hover:bg-slate-700/30 hover:text-white text-slate-300 font-medium gap-1"
-                        >
-                          Model {getSortIcon('name')}
-                        </Button>
-                      </TableHead>
-                      <TableHead className="py-3 text-slate-300">
-                        <div className="text-slate-300 font-medium pl-2">
-                          Capabilities
+                    <TableRow className="border-zinc-800 hover:bg-transparent bg-zinc-950">
+                      <TableHead
+                        className="cursor-pointer py-2.5 text-zinc-300 font-medium hover:text-white transition-colors"
+                        onClick={() => handleSort('name')}
+                      >
+                        <div className="flex items-center">
+                          <span>Model</span> {getSortIcon('name')}
                         </div>
                       </TableHead>
-                      <TableHead className="py-3 text-slate-300 hidden sm:table-cell">
-                        <Button 
-                          variant="ghost" 
-                          onClick={() => handleSort('versions')}
-                          className="hover:bg-slate-700/30 hover:text-white text-slate-300 font-medium gap-1"
-                        >
-                          Versions {getSortIcon('versions')}
-                        </Button>
+                      <TableHead className="py-2.5 text-zinc-300 font-medium">
+                        Capabilities
                       </TableHead>
-                      <TableHead className="py-3 text-slate-300 hidden md:table-cell">
-                        <Button 
-                          variant="ghost" 
-                          onClick={() => handleSort('size')}
-                          className="hover:bg-slate-700/30 hover:text-white text-slate-300 font-medium gap-1"
-                        >
-                          Size {getSortIcon('size')}
-                        </Button>
+                      <TableHead
+                        className="cursor-pointer py-2.5 text-zinc-300 font-medium hover:text-white transition-colors"
+                        onClick={() => handleSort('versions')}
+                      >
+                        <div className="flex items-center">
+                          <span>Versions</span> {getSortIcon('versions')}
+                        </div>
                       </TableHead>
-                      <TableHead className="py-3 text-slate-300 hidden lg:table-cell">
-                        <Button 
-                          variant="ghost" 
-                          onClick={() => handleSort('context')}
-                          className="hover:bg-slate-700/30 hover:text-white text-slate-300 font-medium gap-1"
-                        >
-                          Context {getSortIcon('context')}
-                        </Button>
+                      <TableHead
+                        className="cursor-pointer py-2.5 text-zinc-300 font-medium hover:text-white transition-colors"
+                        onClick={() => handleSort('size')}
+                      >
+                        <div className="flex items-center">
+                          <Gauge className="mr-2 h-4 w-4 text-zinc-400" />
+                          <span>Size</span> {getSortIcon('size')}
+                        </div>
                       </TableHead>
-                      <TableHead className="py-3 w-14"></TableHead>
+                      <TableHead
+                        className="cursor-pointer py-2.5 text-zinc-300 font-medium hover:text-white transition-colors"
+                        onClick={() => handleSort('context')}
+                      >
+                        <div className="flex items-center">
+                          <Brain className="mr-2 h-4 w-4 text-zinc-400" />
+                          <span>Context</span> {getSortIcon('context')}
+                        </div>
+                      </TableHead>
+                      <TableHead className="text-right py-2.5 text-zinc-300 font-medium">
+                        Link
+                      </TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {filteredAndSortedModels.map((model, index) => (
                       <TableRow 
                         key={index} 
-                        className="border-slate-700/30 hover:bg-slate-800/50 transition-colors"
+                        className="border-zinc-800 hover:bg-zinc-800/50 transition-colors"
                       >
-                        <TableCell className="py-3">
+                        <TableCell className="py-2.5">
                           <div className="font-medium text-white">
                             {model.name}
                           </div>
-                          <div className="text-sm text-slate-400 mt-0.5 max-w-52 lg:max-w-md truncate">
+                          <div className="text-sm text-zinc-400 mt-1 max-w-52 lg:max-w-md truncate">
                             {model.description}
                           </div>
                         </TableCell>
-                        <TableCell className="py-3">
-                          <div className="flex flex-wrap gap-1.5">
+                        <TableCell className="py-2.5">
+                          <div className="flex flex-wrap gap-1 mt-1">
                             {model.capabilities.slice(0, 3).map((capability, idx) => (
                               <Badge 
                                 key={idx} 
                                 variant="secondary" 
-                                className="bg-slate-700/60 text-blue-300 border-0 flex items-center gap-1.5 py-1 h-auto"
+                                className="bg-zinc-800 text-white border-zinc-700 flex items-center gap-1.5 py-1 h-auto"
                               >
                                 {getCapabilityIcon(capability)}
                                 <span className="text-xs capitalize">
@@ -492,47 +485,47 @@ export default function Home() {
                             {model.capabilities.length > 3 && (
                               <Badge 
                                 variant="outline" 
-                                className="text-xs bg-transparent border-slate-700 text-slate-400"
+                                className="text-xs bg-transparent border-zinc-700 text-white"
                               >
                                 +{model.capabilities.length - 3}
                               </Badge>
                             )}
                           </div>
                         </TableCell>
-                        <TableCell className="py-4 hidden sm:table-cell">
+                        <TableCell className="py-2.5 hidden sm:table-cell">
                           <div className="flex items-center gap-2">
-                            <span className="font-mono text-white bg-slate-700/40 px-2 py-0.5 rounded-md min-w-[2rem] text-center">
+                            <span className="font-mono text-white bg-zinc-800 px-2.5 py-0.5 rounded-md min-w-[2rem] text-center">
                               {model.versions.length}
                             </span>
                             {model.versions.some(v => v.isLatest) && (
-                              <Badge className="bg-blue-500/20 text-blue-300 border-blue-500/20 flex items-center gap-1">
+                              <Badge className="bg-zinc-800 text-white border-zinc-700 flex items-center gap-1">
                                 <Clock className="h-3 w-3" />
                                 <span className="text-xs">latest</span>
                               </Badge>
                             )}
                           </div>
                         </TableCell>
-                        <TableCell className="py-4 hidden md:table-cell">
-                          <div className="font-mono text-sm text-white bg-slate-700/40 px-2 py-0.5 rounded-md inline-flex items-center gap-1.5">
-                            <Tag className="h-3.5 w-3.5 text-slate-400" />
+                        <TableCell className="py-2.5 hidden md:table-cell">
+                          <div className="font-mono text-sm text-white bg-zinc-800 px-2.5 py-0.5 rounded-md inline-flex items-center gap-1.5">
+                            <Tag className="h-3.5 w-3.5 text-zinc-400" />
                             {getModelSizes(model.versions)}
                           </div>
                         </TableCell>
-                        <TableCell className="py-4 hidden lg:table-cell">
-                          <div className="font-mono text-sm text-white bg-slate-700/40 px-2 py-0.5 rounded-md inline-flex items-center gap-1.5">
-                            <Gauge className="h-3.5 w-3.5 text-slate-400" />
+                        <TableCell className="py-2.5 hidden lg:table-cell">
+                          <div className="font-mono text-sm text-white bg-zinc-800 px-2.5 py-0.5 rounded-md inline-flex items-center gap-1.5">
+                            <Gauge className="h-3.5 w-3.5 text-zinc-400" />
                             {getMaxContext(model.versions)}
                           </div>
                         </TableCell>
-                        <TableCell className="py-3">
+                        <TableCell className="py-2.5 text-right">
                           <Button
-                            variant="ghost"
+                            variant="outline"
                             size="icon"
                             asChild
-                            className="h-9 w-9 rounded-full bg-blue-500/10 hover:bg-blue-500/20 border border-slate-700"
+                            className="h-9 w-9 rounded-full bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 text-white hover:text-white"
                           >
                             <a href={model.url} target="_blank" rel="noopener noreferrer" aria-label={`Visit ${model.name}`}>
-                              <ExternalLink className="h-4 w-4 text-blue-400" />
+                              <ExternalLink className="h-4 w-4" />
                             </a>
                           </Button>
                         </TableCell>
@@ -543,19 +536,19 @@ export default function Home() {
               </div>
             </div>
           ) : (
-            <div className="text-center py-10 bg-slate-800/30 rounded-lg border border-slate-700">
-              <div className="inline-block rounded-full bg-slate-800 p-4 mb-4">
-                <Search className="h-8 w-8 text-slate-500" />
+            <div className="text-center py-16 bg-zinc-900 rounded-lg border border-zinc-800 shadow-lg">
+              <div className="inline-block rounded-full bg-zinc-800 p-5 mb-6 border border-zinc-700">
+                <Search className="h-8 w-8 text-zinc-500" />
               </div>
-              <h3 className="text-xl font-medium text-white mb-2">No models match your search</h3>
-              <p className="text-slate-400 mb-6">Try adjusting your search or filters</p>
+              <h3 className="text-2xl font-medium text-white mb-3">No models match your search</h3>
+              <p className="text-zinc-400 mb-8">Try adjusting your search or filters</p>
               <Button 
                 onClick={() => {
                   setSearchTerm('');
                   setActiveCapabilityFilter(null);
                 }}
                 variant="outline"
-                className="border-slate-600"
+                className="border-zinc-700 bg-zinc-800 hover:bg-zinc-700 text-white px-4 py-1 h-auto text-xs"
               >
                 Clear Filters
               </Button>
@@ -563,7 +556,7 @@ export default function Home() {
           )}
           
           {/* Footer */}
-          <div className="mt-6 text-center text-sm text-slate-500">
+          <div className="mt-8 text-center text-sm text-zinc-600">
             <p>Data automatically loaded from cached source</p>
           </div>
         </div>
