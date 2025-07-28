@@ -360,7 +360,7 @@ export default function Home() {
           {/* Search */}
           <div className="mb-2">
             
-            <div className="w-full max-w-xl mx-auto relative mb-2">
+            <div className="w-full max-w-xl mx-auto relative mb-4">
               <div className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-500">
                 <Search className="h-5 w-5" />
               </div>
@@ -368,12 +368,15 @@ export default function Home() {
                 placeholder="Search models..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-12 h-9 text-sm bg-zinc-900 border-zinc-800 text-white rounded-md shadow-lg focus-visible:ring-1 focus-visible:ring-white focus-visible:border-transparent"
+                className="pl-12 pr-24 h-9 text-sm bg-zinc-900 border-zinc-800 text-white rounded-md shadow-lg focus-visible:ring-1 focus-visible:ring-white focus-visible:border-transparent"
               />
+              <div className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-zinc-500">
+                {filteredAndSortedModels.length} of {models.length}
+              </div>
             </div>
             
             {/* Capability filters */}
-            <div className="flex flex-wrap items-center justify-center gap-1.5 mb-2">
+            <div className="flex flex-wrap items-center justify-center gap-1.5 mb-5">
               <Button
                 variant={activeCapabilityFilter === null ? "secondary" : "outline"}
                 size="sm"
@@ -396,13 +399,12 @@ export default function Home() {
               ))}
             </div>
             
-            {/* Stats */}
-            <div className="text-center text-xs text-zinc-500 mb-1">
-              Showing {filteredAndSortedModels.length} of {models.length} models
-              {activeCapabilityFilter && (
-                <span> • Filtered by <span className="text-white capitalize">{activeCapabilityFilter}</span></span>
-              )}
-            </div>
+            {/* Filtered by indicator */}
+            {activeCapabilityFilter && (
+              <div className="text-center text-xs text-zinc-400 mb-3">
+                <span>Filtered by <span className="text-white capitalize">{activeCapabilityFilter}</span></span>
+              </div>
+            )}
           </div>
 
           {/* Table */}
@@ -556,7 +558,7 @@ export default function Home() {
           )}
           
           {/* Footer */}
-          <div className="mt-8 text-center text-sm text-zinc-600">
+          <div className="mt-10 text-center text-sm text-zinc-600">
             <p>Data automatically loaded from cached source</p>
           </div>
         </div>
