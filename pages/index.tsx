@@ -18,35 +18,12 @@ import {
   MessagesSquare,
   Sparkles,
   Database,
-  Github
+  Github,
+  RefreshCw,
+  Info
 } from 'lucide-react';
 
-// Detailed type definitions for strong typing
-interface ModelVersion {
-  name: string;
-  size: string;
-  context: string;
-  input: string;
-  updated: string;
-  isLatest?: boolean;
-  url: string;
-}
-
-interface ModelData {
-  name: string;
-  url: string;
-  description: string;
-  capabilities: string[];
-  pulls: string;
-  tags: string;
-  updated: string;
-  versions: ModelVersion[];
-}
-
-interface ApiResponse {
-  models: ModelData[];
-  limit?: number;
-}
+import { ModelData, ModelVersion, ApiResponse } from '@/lib/types';
 
 type SortField = 'name' | 'capabilities' | 'versions' | 'size' | 'context';
 type SortDirection = 'asc' | 'desc';
@@ -64,18 +41,60 @@ export default function Home() {
   // State management
   const [models, setModels] = useState<ModelData[]>([]);
   const [initialLoading, setInitialLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [lastUpdated, setLastUpdated] = useState<string | null>(null);
+  const [cacheAge, setCacheAge] = useState<number | null>(null);
+  const [isPending, setIsPending] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [sortField, setSortField] = useState<SortField>('name');
   const [sortDirection, setSortDirection] = useState<SortDirection>('asc');
   const [activeCapabilityFilter, setActiveCapabilityFilter] = useState<string | null>(null);
 
-  // Data fetching
+  // Data fetching function
+  const fetchModels = async () => {
+    try {
+      const response = await fetch('/api/models');
+      const data = await response.json();
+      setModels(data.models || []);
+      setLastUpdated(data.lastUpdated || null);
+      setCacheAge(data.cacheAgeMinutes || null);
+      setIsPending(data.status === 'pending');
+      return data.status;
+    } catch (error) {
+      console.log('No data found:', error);
+      return 'error';
+    }
+  };
+
+  // Polling function for when data is pending
+  const pollForUpdates = async () => {
+    const status = await fetchModels();
+    if (status === 'pending') {
+      // Continue polling every 5 seconds
+      setTimeout(pollForUpdates, 5000);
+    } else {
+      // Data is ready or error, stop polling
+      setRefreshing(false);
+    }
+  };
+
+  // Refresh data by calling scrape API
+  const refreshData = async () => {
+    setRefreshing(true);
+    try {
+      // Trigger scraping (responds immediately)
+      await fetch('/api/scrape');
+      // Start polling for updates
+      pollForUpdates();
+    } catch (error) {
+      console.error('Error refreshing data:', error);
+      setRefreshing(false);
+    }
+  };
+
+  // Initial data fetching
   useEffect(() => {
-    fetch('/ollama.json')
-      .then(res => res.json())
-      .then((data: ApiResponse) => setModels(data.models || []))
-      .catch(() => console.log('No data found'))
-      .finally(() => setInitialLoading(false));
+    fetchModels().finally(() => setInitialLoading(false));
   }, []);
 
   // Extract unique capabilities across all models for filtering
@@ -330,40 +349,43 @@ export default function Home() {
     );
   }
 
-  // No models found state
-  if (models.length === 0) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-900 to-slate-800 text-white flex items-center justify-center">
-        <div className="text-center px-6 py-16 max-w-md mx-auto">
-          <div className="inline-block rounded-full bg-slate-800 p-6 mb-6 shadow-lg shadow-slate-900/50">
-            <Brain className="h-16 w-16 text-slate-300 opacity-50" />
-          </div>
-          <h1 className="text-3xl font-bold text-white mb-4">No Models Found</h1>
-          <p className="text-slate-300 mb-8 leading-relaxed">
-            No model data is currently available. Try running the scraper API endpoint to gather model information.
-          </p>
-          <Button 
-            className="bg-blue-500 hover:bg-blue-600 transition-colors"
-            onClick={() => window.location.href = '/api/scrape?save=true'}
-          >
-            Run Scraper
-          </Button>
-        </div>
-      </div>
-    );
-  }
+  // Continue with normal UI even if no models (will show empty list)
 
   // Main UI
   return (
     <div className="min-h-screen bg-black text-white">
       <div className="container mx-auto px-4 py-3">
         <div className="w-full mx-auto">
-          {/* GitHub Link */}
-          <div className="text-center text-sm mb-3">
+          {/* Header with GitHub Link and Refresh Button */}
+          <div className="flex justify-between items-center text-sm mb-3">
             <a href="https://github.com/p32929/ollama_models_explorer" target="_blank" rel="noopener noreferrer" className="inline-flex items-center text-zinc-400 hover:text-white transition-colors">
               <Github className="h-4 w-4 mr-1" />
               <span>GitHub Repository</span>
             </a>
+            
+            <div className="flex items-center gap-3">
+              {/* Cache info */}
+              {lastUpdated && (
+                <div className="flex items-center text-zinc-500 text-xs">
+                  <Info className="h-3 w-3 mr-1" />
+                  <span>
+                    Updated {cacheAge !== null ? `${cacheAge} min ago` : 'recently'}
+                  </span>
+                </div>
+              )}
+              
+              {/* Refresh button */}
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={refreshData}
+                disabled={refreshing || isPending}
+                className="text-xs bg-zinc-800 border-zinc-700 hover:bg-zinc-700 text-white disabled:opacity-50"
+              >
+                <RefreshCw className={`h-3 w-3 mr-1 ${(refreshing || isPending) ? 'animate-spin' : ''}`} />
+                {isPending ? 'Updating...' : refreshing ? 'Starting...' : 'Refresh Data'}
+              </Button>
+            </div>
           </div>
           
           {/* Search */}
@@ -417,7 +439,16 @@ export default function Home() {
           </div>
 
           {/* Table */}
-          {filteredAndSortedModels.length > 0 ? (
+          {models.length === 0 && !isPending && !refreshing ? (
+            // No models loaded yet - show load button
+            <div className="text-center py-16 bg-zinc-900 rounded-lg border border-zinc-800 shadow-lg">
+              <div className="inline-block rounded-full bg-zinc-800 p-5 mb-6 border border-zinc-700">
+                <Search className="h-8 w-8 text-zinc-500" />
+              </div>
+              <h3 className="text-2xl font-medium text-white mb-3">No Models Loaded</h3>
+              <p className="text-zinc-400 mb-8">Click the "Refresh Data" button above to load models from Ollama.com</p>
+            </div>
+          ) : filteredAndSortedModels.length > 0 ? (
             <div className="overflow-hidden bg-zinc-900 border border-zinc-800 rounded-lg shadow-xl">
               <div className="overflow-x-auto">
                 <Table>
@@ -546,7 +577,8 @@ export default function Home() {
                 </Table>
               </div>
             </div>
-          ) : (
+          ) : models.length > 0 ? (
+            // Models are loaded but none match search/filter
             <div className="text-center py-16 bg-zinc-900 rounded-lg border border-zinc-800 shadow-lg">
               <div className="inline-block rounded-full bg-zinc-800 p-5 mb-6 border border-zinc-700">
                 <Search className="h-8 w-8 text-zinc-500" />
@@ -564,11 +596,49 @@ export default function Home() {
                 Clear Filters
               </Button>
             </div>
+          ) : (
+            // Loading or pending state - show empty table structure
+            <div className="overflow-hidden bg-zinc-900 border border-zinc-800 rounded-lg shadow-xl">
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow className="border-zinc-800 hover:bg-transparent bg-zinc-950">
+                      <TableHead className="py-2.5 text-zinc-300 font-medium">Model</TableHead>
+                      <TableHead className="py-2.5 text-zinc-300 font-medium">Capabilities</TableHead>
+                      <TableHead className="py-2.5 text-zinc-300 font-medium">Versions</TableHead>
+                      <TableHead className="py-2.5 text-zinc-300 font-medium">Size</TableHead>
+                      <TableHead className="py-2.5 text-zinc-300 font-medium">Context</TableHead>
+                      <TableHead className="py-2.5 text-zinc-300 font-medium">Link</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    <TableRow className="border-zinc-800">
+                      <TableCell colSpan={6} className="py-8 text-center text-zinc-400">
+                        {isPending ? 'Loading models from Ollama.com...' : refreshing ? 'Starting scraper...' : 'Ready to load models'}
+                      </TableCell>
+                    </TableRow>
+                  </TableBody>
+                </Table>
+              </div>
+            </div>
           )}
           
           {/* Footer */}
-          <div className="mt-10 text-center text-sm text-zinc-600">
-            <p>Data automatically loaded from cached source</p>
+          <div className="mt-10 text-center text-sm text-zinc-600 space-y-2">
+            <p>Data served from in-memory cache • {models.length} models loaded</p>
+            {lastUpdated && (
+              <p className="text-xs">
+                Last updated: {new Date(lastUpdated).toLocaleString()}
+                {cacheAge !== null && cacheAge > 0 && (
+                  <span className="ml-2">({cacheAge} minutes ago)</span>
+                )}
+              </p>
+            )}
+            {!lastUpdated && (
+              <p className="text-xs text-zinc-500">
+                No data loaded yet • Click "Refresh Data" to load models from Ollama.com
+              </p>
+            )}
           </div>
         </div>
       </div>

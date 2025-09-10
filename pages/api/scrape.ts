@@ -2,29 +2,8 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 import axios, { AxiosError } from 'axios';
 import * as cheerio from 'cheerio';
 import pLimit from 'p-limit';
-import { promises as fs } from 'fs';
-import path from 'path';
-
-interface ModelVersion {
-  name: string;
-  size: string;
-  context: string;
-  input: string;
-  updated: string;
-  isLatest?: boolean;
-  url: string;
-}
-
-interface ModelData {
-  name: string;
-  url: string;
-  description: string;
-  capabilities: string[];
-  pulls: string;
-  tags: string;
-  updated: string;
-  versions: ModelVersion[];
-}
+import { dataCache } from '@/lib/dataCache';
+import { ModelData, ModelVersion } from '@/lib/types';
 
 async function fetchModelDetails(url: string): Promise<ModelVersion[]> {
   try {
@@ -118,11 +97,11 @@ async function fetchModelDetails(url: string): Promise<ModelVersion[]> {
   }
 }
 
-export default async function handler(
-  req: NextApiRequest,
-  res: NextApiResponse<{ models: ModelData[]; limit?: number } | { error: string }>
-) {
+// Background scraping function
+async function performScraping(limit: number = Infinity) {
   try {
+    console.log('Starting background scraping...');
+    
     // Fetch the HTML content from the target URL
     const { data } = await axios.get('https://ollama.com/search');
     
@@ -131,19 +110,16 @@ export default async function handler(
     
     // Initialize array to store model data
     const models: ModelData[] = [];
-    
-    // Get limit from query parameter, default to Infinity if not provided or invalid
-    const limit = req.query.limit ? Math.max(1, parseInt(req.query.limit as string) || Infinity) : Infinity;
     let processedCount = 0;
     
     // Find model list items up to the limit
     $('li[x-test-model]').each((_: number, element) => {
       // Stop processing if we've reached the limit
-      if (processedCount >= limit) return false; // Returning false breaks the each loop
+      if (processedCount >= limit) return false;
       
       processedCount++;
       const $el = $(element);
-      
+
       // Extract model name
       const name = $el.find('[x-test-search-response-title]').text().trim();
       
@@ -168,23 +144,23 @@ export default async function handler(
       // Extract last updated time
       const updated = $el.find('[x-test-updated]').text().trim();
       
-      // Add model data to array (fetch details in parallel for better performance)
+      // Add model data to array
       models.push({
         name,
-        url: `https://ollama.com${url}`, // Convert to full URL
+        url: `https://ollama.com${url}`,
         description,
         capabilities,
         pulls,
         tags,
         updated,
-        versions: [] // Will be populated after all models are collected
+        versions: []
       });
     });
     
     // Set up rate limiting (max 3 concurrent requests)
     const concurrencyLimit = pLimit(3);
     
-    // Create an array of promises with rate limiting, only up to the limit
+    // Create an array of promises with rate limiting
     const modelDetailPromises = models.slice(0, limit).map(model => 
       concurrencyLimit(() => 
         fetchModelDetails(model.url.replace('https://ollama.com', ''))
@@ -195,41 +171,51 @@ export default async function handler(
       )
     );
     
-    // Wait for all model details to be fetched with rate limiting
+    // Wait for all model details to be fetched
     const modelsWithDetails = await Promise.all(modelDetailPromises);
     
-    // Ensure we have valid data before sending response
-    if (!modelsWithDetails || !Array.isArray(modelsWithDetails)) {
-      throw new Error('Failed to fetch model details');
-    }
-    
-    // Return the models data with details in the response
-    const response = { 
+    // Store completed data in cache
+    const responseData = { 
       models: modelsWithDetails,
-      limit: limit < Infinity ? limit : undefined
+      limit: limit < Infinity ? limit : undefined,
+      status: 'ready' as const
     };
+
+    dataCache.set(responseData);
+    console.log(`✅ Cached ${modelsWithDetails.length} models in memory at ${new Date().toISOString()}`);
     
-    // Save to file if save=true is in the query parameters
-    if (req.query.save === 'true') {
-      try {
-        const publicDir = path.join(process.cwd(), 'public');
-        const filePath = path.join(publicDir, 'ollama.json');
-        
-        // Ensure public directory exists
-        await fs.mkdir(publicDir, { recursive: true });
-        
-        // Write the data to the file
-        await fs.writeFile(filePath, JSON.stringify(response, null, 2), 'utf8');
-        console.log(`Data saved to ${filePath}`);
-      } catch (error) {
-        console.error('Error saving data to file:', error);
-        // Don't fail the request if file save fails
-      }
-    }
-    
-    res.status(200).json(response);
   } catch (error) {
-    console.error('Error scraping website:', error);
-    res.status(500).json({ error: 'Failed to scrape website' });
+    console.error('❌ Background scraping failed:', error);
+    // Clear pending status on error
+    const currentData = dataCache.get();
+    if (currentData) {
+      dataCache.set({ ...currentData, status: 'ready' });
+    }
+  }
+}
+
+export default async function handler(
+  req: NextApiRequest,
+  res: NextApiResponse<{ message: string; status: string } | { error: string }>
+) {
+  try {
+    // Get limit from query parameter
+    const limit = req.query.limit ? Math.max(1, parseInt(req.query.limit as string) || Infinity) : Infinity;
+    
+    // Set cache to pending status immediately
+    dataCache.setPending();
+    
+    // Start background scraping (don't await)
+    performScraping(limit);
+    
+    // Respond immediately
+    res.status(200).json({
+      message: 'Scraping started in background',
+      status: 'pending'
+    });
+    
+  } catch (error) {
+    console.error('Error starting scrape:', error);
+    res.status(500).json({ error: 'Failed to start scraping' });
   }
 }
