@@ -7,7 +7,12 @@ import { ModelData, ModelVersion } from '@/lib/types';
 
 async function fetchModelDetails(url: string): Promise<ModelVersion[]> {
   try {
-    const { data } = await axios.get(`https://ollama.com${url}`);
+    const { data } = await axios.get(`https://ollama.com${url}`, {
+      timeout: 5000, // 5 second timeout for individual model pages
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (compatible; OllamaExplorer/1.0)'
+      }
+    });
     const $ = cheerio.load(data);
     const versions: ModelVersion[] = [];
 
@@ -102,8 +107,13 @@ async function performScraping(limit: number = Infinity) {
   try {
     console.log('Starting background scraping...');
     
-    // Fetch the HTML content from the target URL
-    const { data } = await axios.get('https://ollama.com/search');
+    // Fetch the HTML content from the target URL with timeout
+    const { data } = await axios.get('https://ollama.com/search', {
+      timeout: 8000, // 8 second timeout
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (compatible; OllamaExplorer/1.0)'
+      }
+    });
     
     // Load the HTML into Cheerio
     const $ = cheerio.load(data);
@@ -157,10 +167,10 @@ async function performScraping(limit: number = Infinity) {
       });
     });
     
-    // Set up rate limiting (max 3 concurrent requests)
-    const concurrencyLimit = pLimit(3);
+    // Set up rate limiting (reduce to 2 concurrent requests for Vercel)
+    const concurrencyLimit = pLimit(2);
     
-    // Create an array of promises with rate limiting
+    // Create an array of promises with rate limiting and error handling
     const modelDetailPromises = models.slice(0, limit).map(model => 
       concurrencyLimit(() => 
         fetchModelDetails(model.url.replace('https://ollama.com', ''))
@@ -168,6 +178,14 @@ async function performScraping(limit: number = Infinity) {
             ...model,
             versions
           }))
+          .catch(error => {
+            console.warn(`Failed to fetch details for ${model.name}:`, error.message);
+            // Return model without versions if detail fetch fails
+            return {
+              ...model,
+              versions: []
+            };
+          })
       )
     );
     
@@ -194,6 +212,14 @@ async function performScraping(limit: number = Infinity) {
   }
 }
 
+// Timeout wrapper to prevent Vercel timeout
+async function withTimeout<T>(promise: Promise<T>, timeoutMs: number): Promise<T> {
+  const timeoutPromise = new Promise<never>((_, reject) => {
+    setTimeout(() => reject(new Error('Operation timeout')), timeoutMs);
+  });
+  return Promise.race([promise, timeoutPromise]);
+}
+
 export default async function handler(
   req: NextApiRequest,
   res: NextApiResponse<{ message: string; status: string } | { error: string }>
@@ -205,14 +231,22 @@ export default async function handler(
     // Set cache to pending status immediately
     dataCache.setPending();
     
-    // Start background scraping (don't await)
-    performScraping(limit);
-    
     // Respond immediately
     res.status(200).json({
       message: 'Scraping started in background',
       status: 'pending'
     });
+    
+    // Start background scraping with timeout (don't await - fire and forget)
+    withTimeout(performScraping(limit), 8000)
+      .catch(error => {
+        console.error('Background scraping timed out or failed:', error.message);
+        // Reset cache status on timeout
+        const currentData = dataCache.get();
+        if (currentData && currentData.status === 'pending') {
+          dataCache.set({ ...currentData, status: 'ready' });
+        }
+      });
     
   } catch (error) {
     console.error('Error starting scrape:', error);
