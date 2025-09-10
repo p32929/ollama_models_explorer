@@ -25,6 +25,7 @@ import {
 } from 'lucide-react';
 
 import { ModelData, ModelVersion, ApiResponse, ScrapingLog } from '@/lib/types';
+import { scrapeOllamaModels } from '@/lib/clientScraper';
 
 type SortField = 'name' | 'capabilities' | 'versions' | 'size' | 'context';
 type SortDirection = 'asc' | 'desc';
@@ -88,17 +89,63 @@ export default function Home() {
     }
   };
 
-  // Refresh data by calling scrape API
+  // Refresh data using client-side scraping
   const refreshData = async () => {
     setRefreshing(true);
+    setLogs([]);
+    setProgress(null);
+    
     try {
-      // Trigger scraping (responds immediately)
-      await fetch('/api/scrape', { method: 'POST' });
-      // Start polling for updates
-      pollForUpdates();
-    } catch (error) {
-      console.error('Error refreshing data:', error);
+      const limit = Infinity; // Or get from user input
+      
+      const onProgress = (message: string, current?: number, total?: number) => {
+        const log = {
+          timestamp: new Date(),
+          message,
+          type: 'info' as const
+        };
+        setLogs(prev => [...prev.slice(-19), log]); // Keep last 20 logs
+        
+        if (current !== undefined && total !== undefined) {
+          setProgress({
+            current: Math.round((current / total) * 100),
+            total: 100,
+            currentTask: message.includes(':') ? message.split(':')[1].trim() : message
+          });
+        }
+      };
+      
+      // Perform client-side scraping
+      const scrapedModels = await scrapeOllamaModels(limit, onProgress);
+      
+      // Send scraped data to server for caching
+      const cacheResponse = await fetch('/api/cache-models', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ models: scrapedModels, limit })
+      });
+      
+      if (cacheResponse.ok) {
+        // Refresh the UI with new data
+        await fetchModels();
+        onProgress('✅ Data cached successfully!');
+      } else {
+        throw new Error('Failed to cache scraped data');
+      }
+      
+    } catch (error: any) {
+      console.error('Error during client-side scraping:', error);
+      const errorLog = {
+        timestamp: new Date(),
+        message: `❌ Scraping failed: ${error.message}`,
+        type: 'error' as const
+      };
+      setLogs(prev => [...prev, errorLog]);
+    } finally {
       setRefreshing(false);
+      setProgress(null);
     }
   };
 
