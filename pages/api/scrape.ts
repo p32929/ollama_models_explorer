@@ -111,12 +111,34 @@ async function performScraping(limit: number = Infinity) {
     dataCache.updateProgress(0, 100, 'Fetching model list');
     
     console.log(`🌐 [FETCH] Requesting https://ollama.com/search`);
-    // Fetch the HTML content from the target URL
-    const { data } = await axios.get('https://ollama.com/search', {
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (compatible; OllamaExplorer/1.0)'
-      }
-    });
+    dataCache.addLog('🌐 Fetching main page from ollama.com', 'info');
+    
+    // Add periodic progress updates to show the process is alive
+    const progressInterval = setInterval(() => {
+      dataCache.addLog('⏳ Still fetching main page...', 'info');
+    }, 5000);
+    
+    let data;
+    try {
+      console.log(`⏱️ [FETCH] Starting axios request at ${new Date().toISOString()}`);
+      const response = await axios.get('https://ollama.com/search', {
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (compatible; OllamaExplorer/1.0)'
+        }
+      });
+      console.log(`⏱️ [FETCH] Axios request completed at ${new Date().toISOString()}`);
+      clearInterval(progressInterval);
+      data = response.data;
+      console.log(`✅ [FETCH] Successfully received response (status: ${response.status})`);
+      dataCache.addLog(`✅ Got response from ollama.com (${response.status})`, 'success');
+    } catch (fetchError: any) {
+      clearInterval(progressInterval);
+      console.error(`❌ [FETCH-ERROR] Failed to fetch ollama.com:`, fetchError);
+      dataCache.addLog(`❌ Failed to fetch ollama.com: ${fetchError.message}`, 'error');
+      throw fetchError;
+    }
+    
+
     
     console.log(`✅ [FETCH] Received ${Math.round(data.length / 1024)}KB of HTML data`);
     dataCache.addLog('✅ Retrieved model list page', 'success');
