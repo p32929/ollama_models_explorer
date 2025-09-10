@@ -194,8 +194,8 @@ export async function scrapeOllamaModels(
     
     onProgress?.(`🔄 Fetching detailed info for ${models.length} models`);
     
-    // Fetch model details with rate limiting (2 concurrent max)
-    const concurrencyLimit = 2;
+    // Fetch model details with higher concurrency for client-side scraping
+    const concurrencyLimit = 8; // Increased from 2 to 8 for faster scraping
     let completedDetails = 0;
     
     for (let i = 0; i < models.length; i += concurrencyLimit) {
@@ -232,9 +232,9 @@ export async function scrapeOllamaModels(
         models[i + j] = batchResults[j];
       }
       
-      // Rate limiting delay between batches
+      // Shorter delay between batches for faster processing
       if (i + concurrencyLimit < models.length) {
-        await delay(1000); // 1 second delay between batches
+        await delay(200); // Reduced from 1000ms to 200ms
       }
     }
     
