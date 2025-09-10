@@ -113,26 +113,44 @@ async function performScraping(limit: number = Infinity) {
     console.log(`🌐 [FETCH] Requesting https://ollama.com/search`);
     dataCache.addLog('🌐 Fetching main page from ollama.com', 'info');
     
-    // Add periodic progress updates to show the process is alive
-    const progressInterval = setInterval(() => {
-      dataCache.addLog('⏳ Still fetching main page...', 'info');
-    }, 5000);
+    console.log(`🔧 [DEBUG] Starting network request`);
+    dataCache.addLog('🔧 Starting network request', 'info');
+    
+    // Create a progress tracking function
+    let isRequestComplete = false;
+    const trackProgress = async () => {
+      let progressCount = 0;
+      while (!isRequestComplete) {
+        await new Promise(resolve => setTimeout(resolve, 5000)); // Wait 5 seconds
+        if (!isRequestComplete) {
+          progressCount++;
+          console.log(`⏳ [PROGRESS-${progressCount}] Still fetching main page... (${progressCount * 5}s elapsed)`);
+          dataCache.addLog(`⏳ Still fetching main page... (${progressCount * 5}s elapsed)`, 'info');
+        }
+      }
+    };
+    
+    // Start progress tracking in background
+    trackProgress();
     
     let data;
     try {
       console.log(`⏱️ [FETCH] Starting axios request at ${new Date().toISOString()}`);
+      dataCache.addLog('⏱️ Starting HTTP request to ollama.com', 'info');
+      
       const response = await axios.get('https://ollama.com/search', {
         headers: {
           'User-Agent': 'Mozilla/5.0 (compatible; OllamaExplorer/1.0)'
         }
       });
+      
       console.log(`⏱️ [FETCH] Axios request completed at ${new Date().toISOString()}`);
-      clearInterval(progressInterval);
+      isRequestComplete = true;
       data = response.data;
       console.log(`✅ [FETCH] Successfully received response (status: ${response.status})`);
       dataCache.addLog(`✅ Got response from ollama.com (${response.status})`, 'success');
     } catch (fetchError: any) {
-      clearInterval(progressInterval);
+      isRequestComplete = true;
       console.error(`❌ [FETCH-ERROR] Failed to fetch ollama.com:`, fetchError);
       dataCache.addLog(`❌ Failed to fetch ollama.com: ${fetchError.message}`, 'error');
       throw fetchError;
