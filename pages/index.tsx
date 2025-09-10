@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import axios from 'axios';
+
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -56,7 +56,8 @@ export default function Home() {
   // Data fetching function
   const fetchModels = async () => {
     try {
-      const { data } = await axios.get('/api/models');
+      const response = await fetch('/api/models');
+      const data = await response.json();
       setModels(data.models || []);
       setLastUpdated(data.lastUpdated || null);
       setCacheAge(data.cacheAgeMinutes || null);
@@ -92,7 +93,7 @@ export default function Home() {
     setRefreshing(true);
     try {
       // Trigger scraping (responds immediately)
-      await axios.post('/api/scrape');
+      await fetch('/api/scrape', { method: 'POST' });
       // Start polling for updates
       pollForUpdates();
     } catch (error) {

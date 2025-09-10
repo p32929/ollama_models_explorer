@@ -1,5 +1,5 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
-import axios, { AxiosError } from 'axios';
+
 import * as cheerio from 'cheerio';
 import pLimit from 'p-limit';
 import { dataCache } from '@/lib/dataCache';
@@ -7,11 +7,18 @@ import { ModelData, ModelVersion } from '@/lib/types';
 
 async function fetchModelDetails(url: string): Promise<ModelVersion[]> {
   try {
-    const { data } = await axios.get(`https://ollama.com${url}`, {
+    const response = await fetch(`https://ollama.com${url}`, {
+      method: 'GET',
       headers: {
         'User-Agent': 'Mozilla/5.0 (compatible; OllamaExplorer/1.0)'
       }
     });
+    
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+    }
+    
+    const data = await response.text();
     const $ = cheerio.load(data);
     const versions: ModelVersion[] = [];
 
@@ -135,18 +142,25 @@ async function performScraping(limit: number = Infinity) {
     
     let data;
     try {
-      console.log(`⏱️ [FETCH] Starting axios request at ${new Date().toISOString()}`);
+      console.log(`⏱️ [FETCH] Starting fetch request at ${new Date().toISOString()}`);
       dataCache.addLog('⏱️ Starting HTTP request to ollama.com', 'info');
       
-      const response = await axios.get('https://ollama.com/search', {
+      // Using native fetch for better Vercel compatibility
+      const response = await fetch('https://ollama.com/search', {
+        method: 'GET',
         headers: {
           'User-Agent': 'Mozilla/5.0 (compatible; OllamaExplorer/1.0)'
         }
       });
       
-      console.log(`⏱️ [FETCH] Axios request completed at ${new Date().toISOString()}`);
+      console.log(`⏱️ [FETCH] Fetch request completed at ${new Date().toISOString()}`);
       isRequestComplete = true;
-      data = response.data;
+      
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
+      
+      data = await response.text();
       console.log(`✅ [FETCH] Successfully received response (status: ${response.status})`);
       dataCache.addLog(`✅ Got response from ollama.com (${response.status})`, 'success');
     } catch (fetchError: any) {
