@@ -8,7 +8,6 @@ import { ModelData, ModelVersion } from '@/lib/types';
 async function fetchModelDetails(url: string): Promise<ModelVersion[]> {
   try {
     const { data } = await axios.get(`https://ollama.com${url}`, {
-      timeout: 5000, // 5 second timeout for individual model pages
       headers: {
         'User-Agent': 'Mozilla/5.0 (compatible; OllamaExplorer/1.0)'
       }
@@ -104,16 +103,24 @@ async function fetchModelDetails(url: string): Promise<ModelVersion[]> {
 
 // Background scraping function
 async function performScraping(limit: number = Infinity) {
+  const startTime = Date.now();
+  console.log(`📋 [SCRAPE-START] Beginning scrape process at ${new Date().toISOString()} (limit: ${limit === Infinity ? 'unlimited' : limit})`);
+  
   try {
-    console.log('Starting background scraping...');
+    dataCache.addLog('🚀 Starting scrape from Ollama.com', 'info');
+    dataCache.updateProgress(0, 100, 'Fetching model list');
     
-    // Fetch the HTML content from the target URL with timeout
+    console.log(`🌐 [FETCH] Requesting https://ollama.com/search`);
+    // Fetch the HTML content from the target URL
     const { data } = await axios.get('https://ollama.com/search', {
-      timeout: 8000, // 8 second timeout
       headers: {
         'User-Agent': 'Mozilla/5.0 (compatible; OllamaExplorer/1.0)'
       }
     });
+    
+    console.log(`✅ [FETCH] Received ${Math.round(data.length / 1024)}KB of HTML data`);
+    dataCache.addLog('✅ Retrieved model list page', 'success');
+    dataCache.updateProgress(20, 100, 'Parsing model list');
     
     // Load the HTML into Cheerio
     const $ = cheerio.load(data);
@@ -123,6 +130,12 @@ async function performScraping(limit: number = Infinity) {
     let processedCount = 0;
     
     // Find model list items up to the limit
+    const totalModelsFound = $('li[x-test-model]').length;
+    const processLimit = Math.min(limit, totalModelsFound);
+    console.log(`📋 [PARSE] Found ${totalModelsFound} models on page, will process ${processLimit}`);
+    dataCache.addLog(`📋 Found ${totalModelsFound} models on page`, 'info');
+    dataCache.updateProgress(30, 100, `Processing ${processLimit} models`);
+    
     $('li[x-test-model]').each((_: number, element) => {
       // Stop processing if we've reached the limit
       if (processedCount >= limit) return false;
@@ -132,6 +145,10 @@ async function performScraping(limit: number = Infinity) {
 
       // Extract model name
       const name = $el.find('[x-test-search-response-title]').text().trim();
+      
+      if (processedCount % 5 === 0 || processedCount <= 3) {
+        dataCache.addLog(`🔍 Processing model: ${name}`, 'info');
+      }
       
       // Extract URL
       const url = $el.find('a').attr('href') || '';
@@ -170,40 +187,70 @@ async function performScraping(limit: number = Infinity) {
     // Set up rate limiting (reduce to 2 concurrent requests for Vercel)
     const concurrencyLimit = pLimit(2);
     
+    console.log(`🔄 [DETAILS] Starting parallel fetch for ${models.length} models (2 concurrent)`);
+    dataCache.addLog(`🔄 Fetching detailed info for ${models.length} models`, 'info');
+    dataCache.updateProgress(50, 100, 'Fetching model details');
+    
+    let completedDetails = 0;
+    
     // Create an array of promises with rate limiting and error handling
-    const modelDetailPromises = models.slice(0, limit).map(model => 
-      concurrencyLimit(() => 
-        fetchModelDetails(model.url.replace('https://ollama.com', ''))
-          .then(versions => ({
+    const modelDetailPromises = models.slice(0, limit).map((model, index) => 
+      concurrencyLimit(async () => {
+        try {
+          const versions = await fetchModelDetails(model.url.replace('https://ollama.com', ''));
+          completedDetails++;
+          
+          if (completedDetails % 3 === 0 || completedDetails <= 2) {
+            dataCache.addLog(`✨ Got details for ${model.name} (${completedDetails}/${models.length})`, 'success');
+            dataCache.updateProgress(50 + (completedDetails / models.length) * 40, 100, `Processing ${model.name}`);
+          }
+          
+          return {
             ...model,
             versions
-          }))
-          .catch(error => {
-            console.warn(`Failed to fetch details for ${model.name}:`, error.message);
-            // Return model without versions if detail fetch fails
-            return {
-              ...model,
-              versions: []
-            };
-          })
-      )
+          };
+        } catch (error: any) {
+          dataCache.addLog(`⚠️ Failed to get details for ${model.name}: ${error.message}`, 'warning');
+          completedDetails++;
+          // Return model without versions if detail fetch fails
+          return {
+            ...model,
+            versions: []
+          };
+        }
+      })
     );
     
     // Wait for all model details to be fetched
     const modelsWithDetails = await Promise.all(modelDetailPromises);
     
     // Store completed data in cache
+    const elapsed = Date.now() - startTime;
+    console.log(`🎉 [SCRAPE-COMPLETE] Successfully scraped ${modelsWithDetails.length} models in ${Math.round(elapsed/1000)}s`);
+    dataCache.addLog(`🎉 Scraping completed! Found ${modelsWithDetails.length} models`, 'success');
+    dataCache.updateProgress(100, 100, 'Complete');
+    
     const responseData = { 
       models: modelsWithDetails,
       limit: limit < Infinity ? limit : undefined,
-      status: 'ready' as const
+      status: 'ready' as const,
+      logs: dataCache.get()?.logs || []
     };
 
     dataCache.set(responseData);
-    console.log(`✅ Cached ${modelsWithDetails.length} models in memory at ${new Date().toISOString()}`);
+    console.log(`✅ [CACHE] Stored ${modelsWithDetails.length} models in memory at ${new Date().toISOString()}`);
     
-  } catch (error) {
-    console.error('❌ Background scraping failed:', error);
+  } catch (error: any) {
+    const elapsed = Date.now() - startTime;
+    console.error(`💥 [SCRAPE-ERROR] Scraping failed after ${Math.round(elapsed/1000)}s:`, error);
+    dataCache.addLog(`❌ Scraping failed: ${error.message}`, 'error');
+    console.error('❌ [SCRAPE-ERROR] Full error details:', {
+      message: error.message,
+      stack: error.stack,
+      code: error.code,
+      response: error.response?.status,
+      url: error.config?.url
+    });
     // Clear pending status on error
     const currentData = dataCache.get();
     if (currentData) {
@@ -238,15 +285,36 @@ export default async function handler(
     });
     
     // Start background scraping with timeout (don't await - fire and forget)
-    withTimeout(performScraping(limit), 8000)
+    console.log(`🚀 Starting background scraping (limit: ${limit === Infinity ? 'unlimited' : limit}) at ${new Date().toISOString()}`);
+    dataCache.addLog(`🚀 Background scraping started (limit: ${limit === Infinity ? 'unlimited' : limit})`, 'info');
+    
+    withTimeout(performScraping(limit), 15000)
+      .then(() => {
+        console.log(`✅ Background scraping completed successfully at ${new Date().toISOString()}`);
+      })
       .catch(error => {
-        console.error('Background scraping timed out or failed:', error.message);
-        // Reset cache status on timeout
-        const currentData = dataCache.get();
-        if (currentData && currentData.status === 'pending') {
-          dataCache.set({ ...currentData, status: 'ready' });
+        const isTimeout = error.message === 'Operation timeout';
+        if (isTimeout) {
+          console.log(`⏰ Timeout watchdog triggered after 15s at ${new Date().toISOString()}, but scraping continues in background`);
+          dataCache.addLog('⏰ Watchdog timeout reached (15s) - scraping continues in background', 'info');
+          // Check if scraping actually completes later
+          setTimeout(() => {
+            const currentData = dataCache.get();
+            if (currentData && currentData.status === 'ready') {
+              console.log(`✅ Scraping completed successfully after watchdog timeout`);
+              dataCache.addLog('✅ Scraping completed successfully (took longer than 15s)', 'success');
+            } else if (currentData && currentData.status === 'pending') {
+              console.log(`⏳ Scraping still in progress after watchdog timeout + 5s`);
+              dataCache.addLog('⏳ Scraping still in progress (taking longer than expected)', 'warning');
+            }
+          }, 5000);
+        } else {
+          console.error(`❌ Background scraping failed with error:`, error);
+          dataCache.addLog(`❌ Scraping failed: ${error.message}`, 'error');
         }
       });
+    
+
     
   } catch (error) {
     console.error('Error starting scrape:', error);

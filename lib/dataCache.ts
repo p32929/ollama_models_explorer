@@ -1,4 +1,4 @@
-import { ModelData, CachedData } from './types';
+import { ModelData, CachedData, ScrapingLog } from './types';
 
 // In-memory cache
 let cachedModels: CachedData | null = null;
@@ -10,11 +10,12 @@ export const dataCache = {
   },
 
   // Set new data in cache
-  set(data: { models: ModelData[]; limit?: number; status?: 'ready' | 'pending' }): void {
+  set(data: { models: ModelData[]; limit?: number; status?: 'ready' | 'pending'; logs?: ScrapingLog[]; progress?: any }): void {
     cachedModels = {
       ...data,
       lastUpdated: new Date(),
-      status: data.status || 'ready'
+      status: data.status || 'ready',
+      logs: data.logs || []
     };
   },
 
@@ -22,12 +23,34 @@ export const dataCache = {
   setPending(): void {
     if (cachedModels) {
       cachedModels.status = 'pending';
+      cachedModels.logs = [];
     } else {
       cachedModels = {
         models: [],
         lastUpdated: new Date(),
-        status: 'pending'
+        status: 'pending',
+        logs: []
       };
+    }
+  },
+
+  // Add log entry
+  addLog(message: string, type: 'info' | 'success' | 'warning' | 'error' = 'info'): void {
+    const log: ScrapingLog = {
+      timestamp: new Date(),
+      message,
+      type
+    };
+    
+    if (cachedModels) {
+      cachedModels.logs = [...(cachedModels.logs || []), log].slice(-20); // Keep last 20 logs
+    }
+  },
+
+  // Update progress
+  updateProgress(current: number, total: number, currentTask: string): void {
+    if (cachedModels) {
+      cachedModels.progress = { current, total, currentTask };
     }
   },
 

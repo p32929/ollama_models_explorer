@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
+import axios from 'axios';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -23,7 +24,7 @@ import {
   Info
 } from 'lucide-react';
 
-import { ModelData, ModelVersion, ApiResponse } from '@/lib/types';
+import { ModelData, ModelVersion, ApiResponse, ScrapingLog } from '@/lib/types';
 
 type SortField = 'name' | 'capabilities' | 'versions' | 'size' | 'context';
 type SortDirection = 'asc' | 'desc';
@@ -45,6 +46,8 @@ export default function Home() {
   const [lastUpdated, setLastUpdated] = useState<string | null>(null);
   const [cacheAge, setCacheAge] = useState<number | null>(null);
   const [isPending, setIsPending] = useState(false);
+  const [logs, setLogs] = useState<ScrapingLog[]>([]);
+  const [progress, setProgress] = useState<{current: number; total: number; currentTask: string} | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [sortField, setSortField] = useState<SortField>('name');
   const [sortDirection, setSortDirection] = useState<SortDirection>('asc');
@@ -53,12 +56,13 @@ export default function Home() {
   // Data fetching function
   const fetchModels = async () => {
     try {
-      const response = await fetch('/api/models');
-      const data = await response.json();
+      const { data } = await axios.get('/api/models');
       setModels(data.models || []);
       setLastUpdated(data.lastUpdated || null);
       setCacheAge(data.cacheAgeMinutes || null);
       setIsPending(data.status === 'pending');
+      setLogs(data.logs || []);
+      setProgress(data.progress || null);
       return data.status;
     } catch (error) {
       console.log('No data found:', error);
@@ -67,13 +71,18 @@ export default function Home() {
   };
 
   // Polling function for when data is pending
-  const pollForUpdates = async () => {
+  const pollForUpdates = async (startTime: number = Date.now(), maxDuration: number = 60000) => {
     const status = await fetchModels();
-    if (status === 'pending') {
-      // Continue polling every 5 seconds
-      setTimeout(pollForUpdates, 5000);
+    const elapsed = Date.now() - startTime;
+    
+    if (status === 'pending' && elapsed < maxDuration) {
+      // Continue polling every 5 seconds for up to 1 minute
+      setTimeout(() => pollForUpdates(startTime, maxDuration), 5000);
     } else {
-      // Data is ready or error, stop polling
+      // Data is ready, error, or max time exceeded - stop polling
+      if (elapsed >= maxDuration && status === 'pending') {
+        console.log('Polling stopped after 1 minute, but scraping may still complete');
+      }
       setRefreshing(false);
     }
   };
@@ -83,7 +92,7 @@ export default function Home() {
     setRefreshing(true);
     try {
       // Trigger scraping (responds immediately)
-      await fetch('/api/scrape');
+      await axios.post('/api/scrape');
       // Start polling for updates
       pollForUpdates();
     } catch (error) {
@@ -369,7 +378,7 @@ export default function Home() {
                 <div className="flex items-center text-zinc-500 text-xs">
                   <Info className="h-3 w-3 mr-1" />
                   <span>
-                    Updated {cacheAge !== null ? `${cacheAge} min ago` : 'recently'}
+                    Updated {cacheAge !== null ? `${cacheAge} min ago` : lastUpdated ? new Date(lastUpdated).toLocaleString() : 'recently'}
                   </span>
                 </div>
               )}
@@ -387,6 +396,52 @@ export default function Home() {
               </Button>
             </div>
           </div>
+          
+          {/* Progress and Logs Display - only show during active scraping */}
+          {(isPending || refreshing) && (
+            <div className="mb-4 bg-zinc-900 border border-zinc-800 rounded-lg p-4">
+              {/* Progress Bar */}
+              {progress && isPending && (
+                <div className="mb-3">
+                  <div className="flex justify-between text-sm text-zinc-300 mb-1">
+                    <span>{progress.currentTask}</span>
+                    <span>{Math.round(progress.current)}%</span>
+                  </div>
+                  <div className="w-full bg-zinc-800 rounded-full h-2">
+                    <div 
+                      className="bg-blue-500 h-2 rounded-full transition-all duration-300" 
+                      style={{width: `${progress.current}%`}}
+                    ></div>
+                  </div>
+                </div>
+              )}
+              
+              {/* Logs */}
+              {logs.length > 0 && (
+                <div className="space-y-1">
+                  <h4 className="text-sm font-medium text-zinc-300 mb-2">Scraping Activity:</h4>
+                  <div className="max-h-32 overflow-y-auto space-y-1 text-xs">
+                    {logs.slice(-8).map((log, index) => (
+                      <div 
+                        key={index} 
+                        className={`flex items-start gap-2 ${
+                          log.type === 'error' ? 'text-red-400' :
+                          log.type === 'warning' ? 'text-yellow-400' :
+                          log.type === 'success' ? 'text-green-400' :
+                          'text-zinc-400'
+                        }`}
+                      >
+                        <span className="text-zinc-500 shrink-0">
+                          {new Date(log.timestamp).toLocaleTimeString([], {hour: '2-digit', minute: '2-digit', second: '2-digit'})}
+                        </span>
+                        <span>{log.message}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
           
           {/* Search */}
           <div className="mb-2">

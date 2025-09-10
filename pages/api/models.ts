@@ -38,7 +38,9 @@ export default async function handler(
       lastUpdated: cachedData.lastUpdated.toISOString(),
       cacheAgeMinutes: dataCache.getAgeInMinutes(),
       limit: cachedData.limit,
-      status: cachedData.status
+      status: cachedData.status,
+      logs: cachedData.logs || [],
+      progress: cachedData.progress
     };
 
     // Set cache headers (cache for 5 minutes on client side)
