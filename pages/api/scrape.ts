@@ -145,7 +145,30 @@ async function performScraping(limit: number = Infinity) {
       console.log(`⏱️ [FETCH] Starting fetch request at ${new Date().toISOString()}`);
       dataCache.addLog('⏱️ Starting HTTP request to ollama.com', 'info');
       
-      // Using native fetch for better Vercel compatibility
+      // First, try a simple connectivity test
+      console.log(`🔍 [DIAG] Testing basic connectivity...`);
+      dataCache.addLog('🔍 Testing connectivity to ollama.com', 'info');
+      
+      try {
+        // Test with a simpler endpoint first
+        const testResponse = await fetch('https://ollama.com/', {
+          method: 'HEAD',
+          headers: {
+            'User-Agent': 'Mozilla/5.0 (compatible; OllamaExplorer/1.0)'
+          }
+        });
+        console.log(`✅ [DIAG] Basic connectivity test passed (${testResponse.status})`);
+        dataCache.addLog(`✅ Basic connectivity OK (${testResponse.status})`, 'info');
+      } catch (testError: any) {
+        console.error(`❌ [DIAG] Basic connectivity failed:`, testError);
+        dataCache.addLog(`❌ Basic connectivity failed: ${testError.message}`, 'error');
+        throw new Error(`Cannot connect to ollama.com: ${testError.message}`);
+      }
+      
+      // Now try the actual search page
+      console.log(`🌐 [FETCH] Requesting search page...`);
+      dataCache.addLog('🌐 Requesting search page', 'info');
+      
       const response = await fetch('https://ollama.com/search', {
         method: 'GET',
         headers: {
