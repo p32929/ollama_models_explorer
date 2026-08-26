@@ -2,6 +2,16 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 import { dataCache } from '@/lib/dataCache';
 import { ModelData } from '@/lib/types';
 
+// The full ollama.com catalogue (200+ models, each with every tag) is several
+// megabytes of JSON — well past Next.js' 1mb default body limit.
+export const config = {
+  api: {
+    bodyParser: {
+      sizeLimit: '32mb'
+    }
+  }
+};
+
 export default async function handler(
   req: NextApiRequest,
   res: NextApiResponse

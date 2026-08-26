@@ -43,8 +43,9 @@ export default async function handler(
       progress: cachedData.progress
     };
 
-    // Set cache headers (cache for 5 minutes on client side)
-    res.setHeader('Cache-Control', 'public, s-maxage=300, stale-while-revalidate=600');
+    // This serves mutable in-memory state, so it must never be cached — a
+    // stale hit here shows an empty list right after a successful refresh.
+    res.setHeader('Cache-Control', 'no-store');
     
     res.status(200).json(response);
     

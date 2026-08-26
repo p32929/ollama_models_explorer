@@ -8,7 +8,7 @@ export default async function handler(
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  const { url } = req.query;
+  const { url, hx } = req.query;
   
   if (!url || typeof url !== 'string') {
     return res.status(400).json({ error: 'URL parameter is required' });
@@ -22,16 +22,26 @@ export default async function handler(
   try {
     console.log(`🌐 [PROXY] Fetching: ${url}`);
     
-    const response = await fetch(url, {
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (compatible; OllamaExplorer/1.0)',
-        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-        'Accept-Language': 'en-US,en;q=0.5',
-        'Accept-Encoding': 'gzip, deflate, br',
-        'DNT': '1',
-        'Connection': 'keep-alive'
-      }
-    });
+    const headers: Record<string, string> = {
+      'User-Agent': 'Mozilla/5.0 (compatible; OllamaExplorer/1.0)',
+      'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+      'Accept-Language': 'en-US,en;q=0.5',
+      'Accept-Encoding': 'gzip, deflate, br',
+      'DNT': '1',
+      'Connection': 'keep-alive'
+    };
+
+    // ollama.com serves its paginated search results as htmx fragments and
+    // redirects (303) to page 1 unless the request is marked as an htmx request.
+    if (hx === '1') {
+      headers['HX-Request'] = 'true';
+    }
+
+    const response = await fetch(url, { headers, redirect: 'manual' });
+
+    if (response.status >= 300 && response.status < 400) {
+      throw new Error(`Unexpected redirect (HTTP ${response.status}) from ${url}`);
+    }
 
     if (!response.ok) {
       throw new Error(`HTTP ${response.status}: ${response.statusText}`);

@@ -127,12 +127,17 @@ export default function Home() {
         body: JSON.stringify({ models: scrapedModels, limit })
       });
       
+      // Show what was just scraped directly; the server cache is only a
+      // convenience for the next page load, so treat it as best effort.
+      setModels(scrapedModels);
+      setLastUpdated(new Date().toISOString());
+      setCacheAge(0);
+      setIsPending(false);
+
       if (cacheResponse.ok) {
-        // Refresh the UI with new data
-        await fetchModels();
         onProgress('✅ Data cached successfully!');
       } else {
-        throw new Error('Failed to cache scraped data');
+        onProgress('⚠️ Models loaded, but the server failed to cache them');
       }
       
     } catch (error: any) {
@@ -287,11 +292,15 @@ export default function Home() {
     if (sizes.length === 0) return 'N/A';
     if (sizes.length === 1) return sizes[0];
     
+    // Cloud models report a usage tier ("Medium Usage") instead of a byte size
+    const measurable = sizes.filter(s => parseSize(s) > 0);
+    if (measurable.length === 0) return Array.from(new Set(sizes)).join(', ');
+
     // Sort sizes numerically for proper min/max
-    const numericSizes = sizes.map(s => parseSize(s));
-    const minSize = sizes[numericSizes.indexOf(Math.min(...numericSizes))];
-    const maxSize = sizes[numericSizes.indexOf(Math.max(...numericSizes))];
-    
+    const numericSizes = measurable.map(s => parseSize(s));
+    const minSize = measurable[numericSizes.indexOf(Math.min(...numericSizes))];
+    const maxSize = measurable[numericSizes.indexOf(Math.max(...numericSizes))];
+
     return minSize === maxSize ? minSize : `${minSize} – ${maxSize}`;
   };
 
