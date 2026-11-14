@@ -105,24 +105,24 @@ function DeviceCard({ device, onDevice, machine, filters, onChange, glance }: Pi
       <div className="mt-3 space-y-1 border-t border-zinc-800 pt-3 text-sm">
         <Tip block tip={{ title: 'Fits your computer', lines: [`Models with a version that fits in ${machine ? `about ${machine.memoryGB} GB of memory on ${machine.label}` : 'your memory'}. Click to show only these.`] }}>
           <button onClick={() => onChange({ fitOnly: !filters.fitOnly })} className="flex w-full items-center justify-between gap-2 rounded-md px-1 py-1 text-left text-zinc-300 hover:bg-zinc-900" data-testid="glance-runs">
-            <span><span className="font-semibold tabular-nums text-emerald-400">{glance.runs.toLocaleString()}</span> run on {device.manual ? 'your' : 'this'} computer</span>
+            <span><span className="font-semibold tabular-nums text-emerald-400">{glance.runs.toLocaleString()}</span> can run on {device.manual ? 'your' : 'this'} computer</span>
           </button>
         </Tip>
-        <Tip block tip={{ title: 'Fast ones', lines: ['Models that should write at least 40 tokens per second here: much faster than you can read. Click to show only these.'] }}>
+        <Tip block tip={{ title: 'Fast ones', lines: ['Models that should make at least 40 tokens per second here: much faster than you can read. Click to show only these.'] }}>
           <button onClick={() => onChange({ minTps: filters.minTps === 40 ? 0 : 40, fitOnly: false })} className="flex w-full items-center rounded-md px-1 py-1 text-left text-zinc-300 hover:bg-zinc-900" data-testid="glance-fast">
-            <span><span className="font-semibold tabular-nums text-lime-400">{glance.fast.toLocaleString()}</span> write 40+ tokens/s</span>
+            <span><span className="font-semibold tabular-nums text-lime-400">{glance.fast.toLocaleString()}</span> can make 40+ tokens per second</span>
           </button>
         </Tip>
         <Tip block tip={{ title: 'New or updated', lines: ['Added to Ollama in the last 30 days, or changed in the last 2 weeks. Click to see them.'] }}>
           <button onClick={() => onChange({ view: 'new' })} className="flex w-full items-center rounded-md px-1 py-1 text-left text-zinc-300 hover:bg-zinc-900" data-testid="glance-new">
-            <span><span className="font-semibold tabular-nums text-blue-400">{glance.fresh.toLocaleString()}</span> new or updated lately</span>
+            <span><span className="font-semibold tabular-nums text-blue-400">{glance.fresh.toLocaleString()}</span> new or updated recently</span>
           </button>
         </Tip>
       </div>
-      <Tip block tip={{ title: 'Only what runs', lines: ['Hide every model that is too big for your computer, or has no known size.'] }}>
+      <Tip block tip={{ title: 'Only what can run', lines: ['Hide every model that is too big for your computer, or has no known size.'] }}>
         <label className="mt-3 flex cursor-pointer select-none items-center gap-2.5 rounded-lg border border-zinc-700 px-3 py-2.5 text-sm text-zinc-200 hover:bg-zinc-900 has-[:checked]:border-emerald-700 has-[:checked]:bg-emerald-500/5 has-[:checked]:text-emerald-300">
           <input type="checkbox" checked={filters.fitOnly} onChange={e => onChange({ fitOnly: e.target.checked })} className="h-4 w-4 accent-emerald-500" data-testid="fit-only" />
-          Only show what runs on it
+          Only show models that can run on it
         </label>
       </Tip>
     </div>

@@ -16,7 +16,7 @@ function FitBadgeBody({ fit, compact }: { fit: Fit; compact: boolean }) {
       return (
         <span className={`${base} border-emerald-700/60 bg-emerald-500/10 text-emerald-400`} data-testid="fit-good">
           <Check className="h-3 w-3" />
-          {compact ? 'Runs well' : `Runs well · up to ${fit.best?.label}`}
+          {compact ? 'Can run well' : `Can run well · up to ${fit.best?.label}`}
           {!compact && approx ? <span className="sr-only">(estimated)</span> : null}
         </span>
       );
@@ -24,14 +24,14 @@ function FitBadgeBody({ fit, compact }: { fit: Fit; compact: boolean }) {
       return (
         <span className={`${base} border-amber-700/60 bg-amber-500/10 text-amber-400`} data-testid="fit-tight">
           <AlertTriangle className="h-3 w-3" />
-          {compact ? 'Tight fit' : `Tight fit · ${fit.best?.label}`}
+          {compact ? 'Barely fits' : `Barely fits · ${fit.best?.label}`}
         </span>
       );
     case 'no':
       return (
         <span className={`${base} border-red-800/60 bg-red-500/10 text-red-400`} data-testid="fit-no">
           <X className="h-3 w-3" />
-          Too big
+          Too big to run
         </span>
       );
     case 'cloud':

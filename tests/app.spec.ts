@@ -359,7 +359,7 @@ test.describe('speed', () => {
 
   test('the at-a-glance line counts what runs here, and each count is a shortcut', async ({ page }) => {
     await page.goto('/');
-    await expect(page.getByTestId('glance-runs')).toContainText('run on this computer');
+    await expect(page.getByTestId('glance-runs')).toContainText('can run on this computer');
     const runs = Number(/\d+/.exec(await page.getByTestId('glance-runs').innerText())![0]);
     expect(runs).toBeGreaterThan(5);
     await page.getByTestId('glance-runs').click();
@@ -452,14 +452,14 @@ test.describe('tooltips', () => {
     await page.goto('/');
     await row(page, 'qwen2.5-coder').getByTestId('fit-good').hover();
     await expect(tip(page)).toBeVisible();
-    await expect(tip(page)).toContainText('Runs well');
+    await expect(tip(page)).toContainText('Can run well');
     await expect(tip(page)).toContainText('14b version');
     await expect(tip(page)).toContainText('about 12 GB of memory on GeForce RTX 4070');
     await page.mouse.move(5, 5);
     await expect(tip(page)).toHaveCount(0);
 
     await row(page, 'bob/huge-70b').getByTestId('fit-no').hover();
-    await expect(tip(page)).toContainText('Too big');
+    await expect(tip(page)).toContainText('Too big to run');
     await expect(tip(page)).toContainText('smallest version');
   });
 

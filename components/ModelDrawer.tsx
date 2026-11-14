@@ -191,7 +191,7 @@ export function ModelDrawer({ model, device, loadVersions, relativeTime, onClose
                       <span className="min-w-0 break-words font-mono text-[13px] text-zinc-100">{v.tag}{isBest && <span className="ml-2 rounded bg-emerald-500/20 px-1.5 py-0.5 font-sans text-[10px] font-semibold uppercase text-emerald-300">Best</span>}</span>
                       <span className="tabular-nums text-zinc-300">{v.estimated ? '~' : ''}{formatGB(v.sizeGB)}</span>
                       <span>
-                        {status === 'no' && fit.status !== 'cloud' ? <span className="text-xs text-red-400">Too big</span> : tps > 0 ? <SpeedBadge tps={tps} compact fit={fit} machine={machine} /> : <span className="text-zinc-600">—</span>}
+                        {status === 'no' && fit.status !== 'cloud' ? <span className="text-xs text-red-400">Too big to run</span> : tps > 0 ? <SpeedBadge tps={tps} compact fit={fit} machine={machine} /> : <span className="text-zinc-600">—</span>}
                         {status === 'tight' && tps > 0 && <span className="ml-1 text-[10px] text-amber-400">tight</span>}
                       </span>
                       <CopyButton text={exact ? `ollama run ${loaded?.find(x => x.name.endsWith(`:${v.tag}`))?.name || `${model.name}:${v.tag}`}` : runName(v.tag)} label={`Copy the command for ${v.tag}`} />

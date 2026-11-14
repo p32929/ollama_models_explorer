@@ -36,7 +36,7 @@ export function explainFit(fit: Fit, m?: Machine): Tip {
     case 'good': {
       const b = fit.best!;
       return {
-        title: 'Runs well',
+        title: 'Can run well',
         lines: [
           `The ${b.label} version${b.estimated ? ' (size estimated)' : ''} is about ${formatGB(b.sizeGB)} to download and needs roughly ${formatGB(need(b.sizeGB))} to run, which fits comfortably in ${mem}${where}.`,
           fit.variants.length > 1 ? 'Bigger versions of this model need more memory than you have.' : '',
@@ -45,11 +45,11 @@ export function explainFit(fit: Fit, m?: Machine): Tip {
     }
     case 'tight': {
       const b = fit.best!;
-      return { title: 'Tight fit', lines: [`The smallest version (${b.label}, about ${formatGB(b.sizeGB)}) fits in ${mem}${where}, but with little to spare. It works, but long chats may slow down.`] };
+      return { title: 'Barely fits', lines: [`The smallest version (${b.label}, about ${formatGB(b.sizeGB)}) fits in ${mem}${where}, but with little to spare. It works, but long chats may slow down.`] };
     }
     case 'no': {
       const s = fit.smallest!;
-      return { title: 'Too big', lines: [`Even the smallest version (${s.label}, about ${formatGB(s.sizeGB)}) needs roughly ${formatGB(need(s.sizeGB))} to run. You have ${mem}${where}.`] };
+      return { title: 'Too big to run', lines: [`Even the smallest version (${s.label}, about ${formatGB(s.sizeGB)}) needs roughly ${formatGB(need(s.sizeGB))} to run. You have ${mem}${where}.`] };
     }
     case 'cloud':
       return { title: 'Cloud', lines: ["This model runs on Ollama's servers instead of your computer, so your memory does not matter."] };
