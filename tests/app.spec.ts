@@ -412,6 +412,7 @@ test.describe('model details', () => {
   });
 
   test('model without a good fit explains why, and cloud models say so', async ({ page }) => {
+    await page.route('**/api/proxy?*', route => route.fulfill({ contentType: 'text/html', body: tagsHtml([['bob/huge-70b:70b', '43GB', '32K']]) }));
     await page.goto('/?model=bob/huge-70b');
     await expect(page.getByTestId('drawer-fit')).toContainText('needs more memory');
     await page.getByTestId('drawer-close').click();
@@ -485,8 +486,13 @@ test.describe('details panel while loading', () => {
     await expect(drawer).toBeVisible();
     await expect(drawer.getByTestId('versions-loading')).toBeVisible();
     await expect(drawer).toContainText('could not be loaded'); // a model that is gone: a plain message, no error
+    // a model whose size is already guessed still shows that it is loading, and nothing stale
     await page.goto('/?model=llava');
+    await expect(drawer.getByTestId('drawer-loading-bar')).toBeVisible();
+    await expect(drawer.getByTestId('versions-loading')).toBeVisible();
+    await expect(drawer.getByTestId('variant-row')).toHaveCount(0);
     await expect(drawer.getByTestId('variant-row')).toHaveCount(1);
+    await expect(drawer.getByTestId('drawer-loading-bar')).toHaveCount(0);
     expect(errors).toEqual([]);
   });
 });

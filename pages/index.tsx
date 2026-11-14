@@ -550,7 +550,7 @@ export default function Home() {
                 <h3 className="mb-3 text-2xl font-medium">No Models Loaded</h3>
                 <p className="mb-8 text-zinc-400">Click the &quot;Refresh&quot; button above to load models from Ollama.com</p>
               </div>
-            ) : results.length === 0 ? (
+            ) : results.length === 0 && liveSearching === null ? (
               <div className="rounded-xl border border-zinc-800 bg-zinc-900/40 py-16 text-center" data-testid="no-results">
                 <div className="mb-6 inline-block rounded-full border border-zinc-700 bg-zinc-800 p-5"><Search className="h-8 w-8 text-zinc-500" /></div>
                 <h3 className="mb-3 text-xl font-medium">No models match</h3>
@@ -559,6 +559,7 @@ export default function Home() {
               </div>
             ) : (
               <div className="space-y-2.5" data-testid="card-list">
+                {liveSearching !== null && [0, 1, 2].map(i => <div key={i} className="shimmer h-[8.5rem] rounded-2xl" aria-hidden data-testid="live-loading" />)}
                 {visible.map(m => (
                   <ModelRow
                     key={m.name}

@@ -98,7 +98,8 @@ export function ModelDrawer({ model, device, loadVersions, relativeTime, onClose
         onClick={e => e.stopPropagation()}
         className="flex h-full w-full flex-col bg-zinc-950 sm:max-w-xl sm:border-l sm:border-zinc-800"
       >
-        <div className="flex items-start gap-3 border-b border-zinc-800 px-4 py-3 pt-[max(0.75rem,env(safe-area-inset-top))]">
+        <div className="relative flex items-start gap-3 border-b border-zinc-800 px-4 py-3 pt-[max(0.75rem,env(safe-area-inset-top))]">
+          {loading && <div className="shimmer absolute inset-x-0 bottom-[-1px] h-0.5" data-testid="drawer-loading-bar" />}
           <div className="min-w-0 flex-1">
             {owner && <button onClick={() => { onOwner(owner); onClose(); }} className="text-xs text-zinc-500 hover:text-zinc-300">by {owner}</button>}
             <h2 className="break-words text-lg font-semibold text-white" data-testid="drawer-title">{owner ? model.name.slice(owner.length + 1) : model.name}</h2>
@@ -111,7 +112,7 @@ export function ModelDrawer({ model, device, loadVersions, relativeTime, onClose
           {/* On your computer */}
           <section className="rounded-xl border border-zinc-800 bg-zinc-900 p-4" data-testid="drawer-fit">
             <div className="mb-2 text-xs font-medium uppercase tracking-wide text-zinc-500">On {device?.label || 'your computer'}</div>
-            {pending && fit.status === 'unknown' ? (
+            {pending ? (
               <div className="space-y-2" aria-busy="true" aria-label="Loading"><div className="shimmer h-7 w-48 rounded-md" /><div className="shimmer h-4 w-3/4 rounded" /></div>
             ) : (<>
             <div className="flex flex-wrap items-center gap-3">
@@ -139,6 +140,7 @@ export function ModelDrawer({ model, device, loadVersions, relativeTime, onClose
                 <code className="min-w-0 flex-1 overflow-x-auto whitespace-nowrap font-mono text-sm text-zinc-100" data-testid="run-command">{runName()}</code>
                 <CopyButton text={runName()} label="Copy the install command" testid="copy-run" />
               </div>
+              {pending && <div className="shimmer h-14 rounded-lg" aria-hidden />}
               {bestTag && !/^latest$/i.test(bestTag) && (
                 <div className="flex items-center gap-2 rounded-lg border border-emerald-900/60 bg-emerald-500/5 p-2 pl-3">
                   <div className="min-w-0 flex-1">
@@ -180,13 +182,13 @@ export function ModelDrawer({ model, device, loadVersions, relativeTime, onClose
               <h3 className="text-sm font-medium text-zinc-200">{showAll ? 'All versions' : 'One version per size'}, with speed on your computer</h3>
               {loading && <span className="inline-flex items-center gap-1.5 text-xs text-zinc-500"><Loader2 className="h-3.5 w-3.5 animate-spin" />Loading all versions…</span>}
             </div>
-            {pending && variants.length === 0 && (
+            {pending && (
               <div className="space-y-2" aria-busy="true" aria-label="Loading versions" data-testid="versions-loading">
                 {[0, 1, 2, 3].map(i => <div key={i} className="shimmer h-11 rounded-lg" />)}
               </div>
             )}
             {variants.length === 0 && !loading && <p className="text-sm text-zinc-500">The list of versions could not be loaded. <a className="text-blue-400 underline" href={`${model.url}/tags`} target="_blank" rel="noopener noreferrer">See them on ollama.com</a>.</p>}
-            {variants.length > 0 && (
+            {variants.length > 0 && !pending && (
               <div className="overflow-hidden rounded-lg border border-zinc-800" data-testid="variants">
                 <div className="grid grid-cols-[minmax(0,1.3fr)_0.8fr_1fr_auto] items-center gap-x-3 border-b border-zinc-800 bg-zinc-900 px-3 py-2 text-[11px] font-medium uppercase tracking-wide text-zinc-500">
                   <span>Version</span><span>Size</span><span>Speed</span><span className="sr-only">Copy</span>
