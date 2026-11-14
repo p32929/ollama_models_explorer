@@ -1,32 +1,72 @@
 # Ollama Models Explorer
 
-A modern, dark-themed UI for exploring and filtering Ollama AI models. This Next.js application provides an efficient interface to browse, search, and sort through a collection of AI models with multiple filtering options.
+**Find the right Ollama model for your computer.** Search all 17,000+ models, see which ones can run on your hardware and how fast, compare them, and copy the install command.
 
-**Live:** https://ollama-models-explorer.vercel.app/
+**Live:** https://ollama-models-explorer.vercel.app/ (see [Please self-host it](#please-self-host-it))
 
-![Ollama Models Explorer: coding models that run on an Apple M2 Pro, with estimated speed](docs/screenshots/desktop.png)
+![Ollama Models Explorer: every model, with a filter panel and what runs on your computer](docs/screenshots/desktop.png)
+
+## Why I built this
+
+Like many people, I want to run local models. But on Ollama's own website you cannot see what you need to choose one. It does not tell you which models will run on a computer like mine, how big each one really is, or how fast it will be. I do not have high-end hardware, so a wrong pick means a big download that is too slow or does not run at all.
+
+So I made a list I can actually decide from. It finds your computer on its own, then shows for every model: can it run here, how many tokens per second to expect, the size, the context window and what it is good at. Filters like "Coding" or "Small & fast" cut 17,000 models down to a few you can try. I hope it saves you the same trouble.
+
+## Please self-host it
+
+The public site runs on a free host. It is not very fast and it is not always up. **If you can, run your own copy.** It takes a minute, it is faster on your machine, and it works offline once the list is saved:
+
+```bash
+git clone https://github.com/p32929/ollama_models_explorer.git
+cd ollama_models_explorer
+yarn install && yarn dev     # then open http://localhost:3000
+```
+
+Or deploy it to Vercel, Netlify or any Node host. If you like it, a star on GitHub helps other people find it.
+
+## Screenshots
+
+**Pick what you want to do.** Tick "Coding" and "Small & fast", and hide everything your computer cannot run:
+
+![Coding and small models that can run on this computer](docs/screenshots/filter-small-coding.png)
+
+**Sort by the fastest on your computer.** Official models with tool support, fastest first, with an estimate of tokens per second:
+
+![Fastest models on this computer](docs/screenshots/fastest.png)
+
+**Filter by what a model can do.** For example, official models that understand images:
+
+![Vision models](docs/screenshots/vision.png)
+
+<p align="center">
+  <img src="docs/screenshots/whats-new.png" width="49%" alt="What's new: models added or updated recently">
+  <img src="docs/screenshots/trending.png" width="49%" alt="Trending: what is rising">
+</p>
 
 <p align="center">
   <img src="docs/screenshots/tooltips.png" width="49%" alt="Hover any number or badge for a plain-words explanation">
-  <img src="docs/screenshots/details.png" width="49%" alt="Details panel: will it run, how fast, install command, every version">
+  <img src="docs/screenshots/details.png" width="49%" alt="Details panel: can it run, how fast, install command, every version">
 </p>
 
 <p align="center">
   <img src="docs/screenshots/compare.png" width="49%" alt="Comparing three models side by side">
 </p>
 
+**On a phone**, the filters open as a bottom sheet and each model is a card:
+
 <p align="center">
-  <img src="docs/screenshots/phone.png" height="460" alt="On a phone: models are cards">
+  <img src="docs/screenshots/phone.png" height="460" alt="Models on a phone">
+  <img src="docs/screenshots/phone-filters.png" height="460" alt="The filters on a phone">
   <img src="docs/screenshots/phone-details.png" height="460" alt="The details panel on a phone">
 </p>
 
 ## Features
 
-**Every model on Ollama.** The ~270 official models (with every version, size and context window) **and the 17,000+ community models** (`user/model-name`), in Official / Community / All tabs.
+**Every model on Ollama.** The ~270 official models (with every version, size and context window) **and the 17,000+ community models** (`user/model-name`), Choose All, Official or Community in the filter panel.
 
-**Will it run on my computer, and how fast?** The page finds your graphics card (or Apple chip) and memory by itself, with nothing to type, marks every model **Can run well / Barely fits / Too big to run / Cloud**, and estimates **tokens per second** (about 0.75 words each), for example `~27 tokens/s`. If the guess is wrong, one tap picks the closest computer. "Only show what runs on it" hides the rest. (Browsers hide exact specs, so it is an estimate. Speed = memory speed × 0.65 ÷ the model's size; mixture-of-experts models, which only use part of themselves for each word, are handled; expect ±30%. Official models use real download sizes, the rest are estimated from the parameter count.)
+**Will it run on my computer, and how fast?** The page finds your graphics card (or Apple chip) and memory by itself, with nothing to type, marks every model **Can run well / Barely fits / Too big to run / Cloud**, and estimates **tokens per second** (about 0.75 words each), for example `~27 tokens/s`. If the guess is wrong, one tap picks the closest computer. "Only show models that can run on it" hides the rest. (Browsers hide exact specs, so it is an estimate. Speed = memory speed × 0.65 ÷ the model's size; mixture-of-experts models, which only use part of themselves for each word, are handled; expect ±30%. Official models use real download sizes, the rest are estimated from the parameter count.)
 
-**Hover anything** (a badge, a number, a column heading, a button) for a tooltip that says in plain words what it means and how it was worked out.
+**Hover anything** (a badge, a number, a tab, a button) for a tooltip that says in plain words what it means and how it was worked out.
 
 **Click any model** for a details panel: will it run and how fast, the exact `ollama run` command (with a copy button, including the best version for your computer), every version with its size and speed, context window, downloads and more.
 
@@ -36,13 +76,14 @@ A modern, dark-themed UI for exploring and filtering Ollama AI models. This Next
 - **Search** by any words in the name, description or capabilities; **Search ollama.com live** for anything newer than the saved list
 - **Filters**: updated recently, size, context window, publisher (click a name), hide near-duplicates, capabilities
 - **Sort** by downloads, last update, name, size, context window, versions or **speed on your computer**; **filter** by minimum speed (10, 20 or 40+ tokens/s)
-- **At a glance** line: how many models run on your computer, how many are fast, how many are new
+- **At a glance**: how many models can run on your computer, how many are fast, how many are new
+- **Always-open filter panel** on the left, so you can see and change every filter at once
 
 **Compare** up to four models side by side (size, context, downloads, whether each runs on your computer).
 
 **What's new / Trending**: models added or updated in the last two weeks, and what is rising. Trending ranks by real download growth once the list has two weekly snapshots, and by downloads plus recent updates until then.
 
-**Made for phones**: models become cards, controls scroll sideways in one row, filters open as a bottom sheet, compare goes full screen, and every tap target is at least 36 px.
+**Made for phones**: models stack as cards, filters open as a bottom sheet, compare goes full screen, and every button is easy to tap.
 
 **Shareable links**: search, filters, sort and the compare list are saved in the address.
 
@@ -72,18 +113,7 @@ yarn test:e2e     # browser tests on desktop and phone sizes, plus the API (uses
 
 ## Getting Started
 
-```bash
-git clone https://github.com/p32929/ollama_models_explorer.git
-cd ollama_models_explorer
-npm install
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-```
-
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the application.
+See [Please self-host it](#please-self-host-it). `npm run dev` or `pnpm dev` work too. Open http://localhost:3000.
 
 ## Data Source
 

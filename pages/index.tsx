@@ -381,7 +381,7 @@ export default function Home() {
     ? 'live'
     : filters.view === 'trending'
       ? growthKnown ? 'Ranked by downloads gained since the last weekly update.' : 'Ranked by downloads and recent updates. Weekly download growth appears after the next list update.'
-      : filters.view === 'new' ? 'Models added in the last 30 days or updated in the last 2 weeks, newest first.' : 'Most downloaded first. Click a model for its speed, versions and install command.';
+      : filters.view === 'new' ? 'Models added in the last 30 days or updated in the last 2 weeks, newest first.' : filters.sort !== 'auto' ? `Sorted by: ${SORT_OPTIONS.find(o => o.id === filters.sort)?.label.toLowerCase()}. Click a model for its speed, versions and install command.` : 'Most downloaded first. Click a model for its speed, versions and install command.';
 
   const panel = (
     <FilterPanel
