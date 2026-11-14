@@ -412,7 +412,7 @@ test.describe('model details', () => {
   });
 
   test('model without a good fit explains why, and cloud models say so', async ({ page }) => {
-    await page.goto('/?model=gpt-oss-cloud');
+    await page.goto('/?model=bob/huge-70b');
     await expect(page.getByTestId('drawer-fit')).toContainText('needs more memory');
     await page.getByTestId('drawer-close').click();
     await page.unroute('**/api/proxy?*');
