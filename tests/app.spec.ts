@@ -462,3 +462,90 @@ test.describe('model details', () => {
     await expect(page.getByTestId('model-drawer')).toHaveCount(0);
   });
 });
+
+test.describe('tooltips', () => {
+  const tip = (page: Page) => page.getByTestId('tooltip');
+
+  test('hovering a badge explains it in plain words', async ({ page }) => {
+    await page.goto('/');
+    await row(page, 'qwen2.5-coder').getByTestId('fit-good').hover();
+    await expect(tip(page)).toBeVisible();
+    await expect(tip(page)).toContainText('Runs well');
+    await expect(tip(page)).toContainText('14b version');
+    await expect(tip(page)).toContainText('about 12 GB of memory on GeForce RTX 4070');
+    await page.mouse.move(5, 5);
+    await expect(tip(page)).toHaveCount(0);
+
+    await row(page, 'bob/huge-70b').getByTestId('fit-no').hover();
+    await expect(tip(page)).toContainText('Too big');
+    await expect(tip(page)).toContainText('smallest version');
+  });
+
+  test('speed, size, downloads and capabilities say what they mean', async ({ page }) => {
+    await page.goto('/');
+    await row(page, 'qwen2.5-coder').getByTestId('speed').hover();
+    await expect(tip(page)).toContainText('tokens per second');
+    await expect(tip(page)).toContainText('words per second');
+    await expect(tip(page)).toContainText('504 GB/s');
+    await expect(tip(page)).toContainText('by about a third');
+    await row(page, 'qwen2.5-coder').getByTestId('downloads').locator('span').first().hover();
+    await expect(tip(page)).toContainText('23,000,000 downloads');
+    await row(page, 'qwen2.5-coder').getByText('0.5b – 32b').hover();
+    await expect(tip(page)).toContainText('billions of parameters');
+    await row(page, 'deepseek-r1').getByText('thinking', { exact: true }).hover();
+    await expect(tip(page)).toContainText('step by step');
+    await row(page, 'llava').getByText('vision', { exact: true }).hover();
+    await expect(tip(page)).toContainText('Understands pictures');
+  });
+
+  test('column headers, tabs and controls explain themselves', async ({ page }) => {
+    await page.goto('/');
+    await page.getByRole('columnheader', { name: /Speed/ }).hover();
+    await expect(tip(page)).toContainText('A token is about three quarters of a word');
+    await page.getByRole('columnheader', { name: /On this computer/ }).hover();
+    await expect(tip(page)).toContainText('fits in your computer');
+    await page.getByTestId('scope-community').hover();
+    await expect(tip(page)).toContainText('Uploaded by other people');
+    await page.getByTestId('view-trending').hover();
+    await expect(tip(page)).toContainText('popular models that were updated recently');
+    await page.getByTestId('device-chip').hover();
+    await expect(tip(page)).toContainText('504 GB/s');
+    await page.getByTestId('glance-runs').hover();
+    await expect(tip(page)).toContainText('Click to show only these');
+    await page.getByTestId('open-tasks').hover();
+    await expect(tip(page)).toContainText('Pick what you want to do');
+    await page.getByTestId('theme-toggle').hover();
+    await expect(tip(page)).toContainText('Switch the colours');
+  });
+
+  test('keyboard focus shows it too, and Escape hides it', async ({ page }) => {
+    await page.goto('/');
+    await page.getByTestId('open-filters').focus();
+    await expect(tip(page)).toContainText('how recently a model was updated');
+    await page.keyboard.press('Escape');
+    await expect(tip(page)).toHaveCount(0);
+  });
+
+  test('a tooltip never leaves the screen, even at the right edge', async ({ page }) => {
+    await page.goto('/');
+    await page.getByTestId('theme-toggle').hover(); // near the right edge
+    await expect(tip(page)).toBeVisible();
+    const vp = page.viewportSize()!;
+    const b = (await tip(page).boundingBox())!;
+    expect(b.x).toBeGreaterThanOrEqual(0);
+    expect(b.x + b.width).toBeLessThanOrEqual(vp.width);
+    expect(b.y).toBeGreaterThanOrEqual(0);
+    // near the top it flips below the thing it describes instead of going off the top
+    const a = (await page.getByTestId('theme-toggle').boundingBox())!;
+    expect(b.y >= a.y + a.height - 1 || b.y + b.height <= a.y + 1, 'does not cover what it describes').toBe(true);
+  });
+
+  test('the tooltip never gets in the way of clicking', async ({ page }) => {
+    await page.goto('/');
+    await row(page, 'qwen2.5-coder').getByTestId('fit-good').hover();
+    await expect(tip(page)).toBeVisible();
+    await row(page, 'qwen2.5-coder').getByTestId('fit-good').click(); // opens the details
+    await expect(page.getByTestId('model-drawer')).toBeVisible();
+    await expect(tip(page)).toHaveCount(0);
+  });
+});

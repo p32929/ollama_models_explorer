@@ -13,6 +13,8 @@ import { FilterSheet } from '@/components/FilterSheet';
 import { Dropdown } from '@/components/Dropdown';
 import { ModelDrawer } from '@/components/ModelDrawer';
 import { SpeedBadge, speedOfFit } from '@/components/SpeedBadge';
+import { Tip } from '@/components/Tip';
+import { COLUMN_HELP, explainCapability, explainContext, explainDownloads, explainSize, explainUpdated, type Machine } from '@/lib/explain';
 import {
   ExternalLink, Search, ArrowUpDown, ArrowUp, ArrowDown, Code2, Brain, Gauge, Tag, Clock, ImageIcon, MessagesSquare,
   Sparkles, Github, RefreshCw, Info, SlidersHorizontal, GitCompare, Sun, Moon, Flame, Rss, Braces, Star, X,
@@ -27,7 +29,7 @@ import { TASKS } from '@/lib/tasks';
 import { daysSince } from '@/lib/units';
 import {
   applyFilters, activeFilterCount, DEFAULT_FILTERS, hasGrowthData, heatOf, isNewModel, isCommunity, ownerOf, sizeSummary, maxContextK,
-  type Filters, type SortField, type View,
+  type Filters, type SortField, type View, type Scope,
 } from '@/lib/filter';
 import { filtersToQuery, queryToFilters } from '@/lib/urlState';
 
@@ -79,6 +81,17 @@ const VIEWS: { id: View; label: string; icon: React.ReactNode }[] = [
   { id: 'new', label: "What's new", icon: <Sparkles className="h-3.5 w-3.5" /> },
   { id: 'trending', label: 'Trending', icon: <Flame className="h-3.5 w-3.5" /> },
 ];
+
+const SCOPE_HELP: Record<Scope, { title: string; lines: string[] }> = {
+  all: { title: 'All models', lines: ['Every model on ollama.com: official and community.'] },
+  official: { title: 'Official', lines: ["Made or curated by Ollama's team. About 270 models, with every version listed."] },
+  community: { title: 'Community', lines: ['Uploaded by other people, named user/model. Often fine-tunes or variations of the official ones.'] },
+};
+const VIEW_HELP: Record<View, { title: string; lines: string[] }> = {
+  browse: { title: 'Browse', lines: ['Everything, most downloaded first.'] },
+  new: { title: "What's new", lines: ['Models added in the last 30 days or updated in the last 2 weeks, newest first.'] },
+  trending: { title: 'Trending', lines: ['What is rising: popular models that were updated recently.'] },
+};
 
 const SORT_OPTIONS: { id: SortField; label: string }[] = [
   { id: 'auto', label: 'Best match' },
@@ -226,6 +239,7 @@ export default function Home() {
   };
   const memoryGB = device?.memoryGB ?? 10;
   const bandwidthGBs = device?.bandwidthGBs ?? 50;
+  const machine: Machine | undefined = useMemo(() => (device ? { label: device.label, memoryGB: device.memoryGB, bandwidthGBs: device.bandwidthGBs } : undefined), [device]);
 
   // ---- address <-> state (shareable links) ----
   useEffect(() => {
@@ -425,16 +439,22 @@ export default function Home() {
             {lastUpdated && (
               <span className="hidden items-center text-xs text-zinc-500 xl:flex"><Info className="mr-1 h-3 w-3" />Updated {cacheAge !== null ? `${cacheAge} min ago` : new Date(lastUpdated).toLocaleString()}</span>
             )}
-            <a href="https://github.com/p32929/ollama_models_explorer" target="_blank" rel="noopener noreferrer" aria-label="GitHub repository" className="flex h-10 w-10 items-center justify-center rounded-md border border-zinc-800 text-zinc-300 hover:bg-zinc-900 hover:text-white lg:h-9 lg:w-9">
-              <Github className="h-4 w-4" />
-            </a>
-            <button onClick={toggleTheme} aria-label={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'} data-testid="theme-toggle" className="flex h-10 w-10 items-center justify-center rounded-md border border-zinc-800 text-zinc-300 hover:bg-zinc-900 hover:text-white lg:h-9 lg:w-9">
-              {theme === 'dark' ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
-            </button>
-            <Button variant="outline" size="sm" onClick={refreshData} disabled={refreshing || isPending} title="Re-read the official models with all their versions" className="h-10 lg:h-9 border-zinc-800 bg-transparent text-zinc-300 hover:bg-zinc-900 hover:text-white disabled:opacity-50">
-              <RefreshCw className={`h-3.5 w-3.5 ${(refreshing || isPending) ? 'animate-spin' : ''}`} />
-              <span>{isPending ? 'Updating...' : refreshing ? 'Starting...' : 'Refresh'}</span>
-            </Button>
+            <Tip tip={{ title: 'Source code', lines: ['Open this project on GitHub.'] }}>
+              <a href="https://github.com/p32929/ollama_models_explorer" target="_blank" rel="noopener noreferrer" aria-label="GitHub repository" className="flex h-10 w-10 items-center justify-center rounded-md border border-zinc-800 text-zinc-300 hover:bg-zinc-900 hover:text-white lg:h-9 lg:w-9">
+                <Github className="h-4 w-4" />
+              </a>
+            </Tip>
+            <Tip tip={{ title: theme === 'dark' ? 'Light mode' : 'Dark mode', lines: ['Switch the colours. Your choice is remembered.'] }}>
+              <button onClick={toggleTheme} aria-label={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'} data-testid="theme-toggle" className="flex h-10 w-10 items-center justify-center rounded-md border border-zinc-800 text-zinc-300 hover:bg-zinc-900 hover:text-white lg:h-9 lg:w-9">
+                {theme === 'dark' ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+              </button>
+            </Tip>
+            <Tip tip={{ title: 'Refresh', lines: ['Re-read the 270 official models from ollama.com, with every version, size and context window. Takes about a minute.'] }}>
+              <Button variant="outline" size="sm" onClick={refreshData} disabled={refreshing || isPending} className="h-10 lg:h-9 border-zinc-800 bg-transparent text-zinc-300 hover:bg-zinc-900 hover:text-white disabled:opacity-50">
+                <RefreshCw className={`h-3.5 w-3.5 ${(refreshing || isPending) ? 'animate-spin' : ''}`} />
+                <span>{isPending ? 'Updating...' : refreshing ? 'Starting...' : 'Refresh'}</span>
+              </Button>
+            </Tip>
           </div>
         </header>
 
@@ -483,15 +503,21 @@ export default function Home() {
 
         {/* At a glance */}
         <div className="mt-3 flex flex-wrap items-center gap-x-5 gap-y-1 text-sm text-zinc-400" data-testid="glance">
-          <button onClick={() => patch({ fitOnly: !filters.fitOnly })} className="hover:text-white" data-testid="glance-runs">
-            <span className="font-semibold text-emerald-400 tabular-nums">{glance.runs.toLocaleString()}</span> run on {device?.manual ? 'your' : 'this'} computer
-          </button>
-          <button onClick={() => patch({ minTps: filters.minTps === 40 ? 0 : 40, fitOnly: false })} className="hover:text-white" data-testid="glance-fast">
-            <span className="font-semibold text-lime-400 tabular-nums">{glance.fast.toLocaleString()}</span> write 40+ tokens per second
-          </button>
-          <button onClick={() => patch({ view: 'new' })} className="hover:text-white" data-testid="glance-new">
-            <span className="font-semibold text-blue-400 tabular-nums">{glance.fresh.toLocaleString()}</span> new or updated lately
-          </button>
+          <Tip tip={{ title: 'Fits your computer', lines: [`Models with a version that fits in ${machine ? `about ${machine.memoryGB} GB of memory on ${machine.label}` : 'your memory'}. Click to show only these.`] }}>
+            <button onClick={() => patch({ fitOnly: !filters.fitOnly })} className="hover:text-white" data-testid="glance-runs">
+              <span className="font-semibold text-emerald-400 tabular-nums">{glance.runs.toLocaleString()}</span> run on {device?.manual ? 'your' : 'this'} computer
+            </button>
+          </Tip>
+          <Tip tip={{ title: 'Fast ones', lines: ['Models that should write at least 40 tokens per second here: much faster than you can read. Click to show only these.'] }}>
+            <button onClick={() => patch({ minTps: filters.minTps === 40 ? 0 : 40, fitOnly: false })} className="hover:text-white" data-testid="glance-fast">
+              <span className="font-semibold text-lime-400 tabular-nums">{glance.fast.toLocaleString()}</span> write 40+ tokens per second
+            </button>
+          </Tip>
+          <Tip tip={{ title: 'New or updated', lines: ['Added to Ollama in the last 30 days, or changed in the last 2 weeks. Click to see them.'] }}>
+            <button onClick={() => patch({ view: 'new' })} className="hover:text-white" data-testid="glance-new">
+              <span className="font-semibold text-blue-400 tabular-nums">{glance.fresh.toLocaleString()}</span> new or updated lately
+            </button>
+          </Tip>
           <span className="hidden text-xs text-zinc-600 lg:ml-auto lg:inline">Click any model for its speed, versions and install command</span>
         </div>
 
@@ -499,8 +525,8 @@ export default function Home() {
         <div className="mt-4 flex flex-wrap items-end justify-between gap-x-6 gap-y-2 border-b border-zinc-800">
           <div className="-mb-px flex max-w-full overflow-x-auto" role="tablist" aria-label="Which models to show">
             {([['all', 'All', allModels.length], ['official', 'Official', officialCount], ['community', 'Community', allModels.length - officialCount]] as const).map(([value, label, count]) => (
+              <Tip key={value} tip={SCOPE_HELP[value]}>
               <button
-                key={value}
                 role="tab"
                 aria-selected={filters.scope === value}
                 data-testid={`scope-${value}`}
@@ -509,12 +535,13 @@ export default function Home() {
               >
                 {label} <span className="ml-1 text-zinc-500 tabular-nums">{count.toLocaleString()}</span>
               </button>
+              </Tip>
             ))}
           </div>
           <div className="mb-1.5 inline-flex max-w-full overflow-x-auto rounded-lg bg-zinc-900 p-0.5" role="tablist" aria-label="View">
             {VIEWS.map(v => (
+              <Tip key={v.id} tip={VIEW_HELP[v.id]}>
               <button
-                key={v.id}
                 role="tab"
                 aria-selected={filters.view === v.id}
                 data-testid={`view-${v.id}`}
@@ -523,14 +550,16 @@ export default function Home() {
               >
                 {v.icon}{v.label}
               </button>
+              </Tip>
             ))}
           </div>
         </div>
 
         {/* Filter bar */}
         <div className="-mx-3 mt-3 flex items-center gap-2 overflow-x-auto px-3 pb-1 sm:-mx-4 sm:px-4 lg:mx-0 lg:overflow-visible lg:px-0 lg:pb-0" data-testid="filter-bar" style={{ scrollbarWidth: 'none' }}>
-          <Dropdown id="tasks" label="I want to" icon={<Sparkles className="h-4 w-4 text-zinc-400" />} multi options={taskOptions} selected={filters.tasks} onChange={tasks => patch({ tasks })} help="Pick one or more: models must match all of them" />
-          <Dropdown id="caps" label="Capabilities" icon={<Brain className="h-4 w-4 text-zinc-400" />} multi options={capabilityOptions} selected={filters.caps} onChange={caps => patch({ caps })} help="Models must have all the ones you tick" />
+          <Dropdown id="tasks" label="I want to" icon={<Sparkles className="h-4 w-4 text-zinc-400" />} multi options={taskOptions} selected={filters.tasks} onChange={tasks => patch({ tasks })} help="Pick one or more: models must match all of them" tip={{ title: 'I want to…', lines: ['Pick what you want to do, such as coding or working with images. Pick several and models must match all of them.'] }} />
+          <Dropdown id="caps" label="Capabilities" icon={<Brain className="h-4 w-4 text-zinc-400" />} multi options={capabilityOptions} selected={filters.caps} onChange={caps => patch({ caps })} help="Models must have all the ones you tick" tip={{ title: 'Capabilities', lines: ['What a model can do besides writing text: use tools, understand images, think step by step and more.'] }} />
+          <Tip tip={{ title: 'More filters', lines: ['Filter by how recently a model was updated, its size, context window, speed on your computer, or publisher.'] }}>
           <button
             onClick={() => setShowFilters(true)}
             data-testid="open-filters"
@@ -538,6 +567,7 @@ export default function Home() {
           >
             <SlidersHorizontal className="h-4 w-4 text-zinc-400" /> More filters{filterCount > 0 && <span className="rounded-full bg-white px-1.5 text-xs font-semibold text-black">{filterCount}</span>}
           </button>
+          </Tip>
           <label className="ml-auto inline-flex shrink-0 items-center gap-2 text-sm text-zinc-500">
             <span className="hidden sm:inline">Sort by</span>
             <select
@@ -601,6 +631,7 @@ export default function Home() {
                 key={m.name}
                 model={m}
                 fit={fitFor(m)}
+                machine={machine}
                 selected={compare.includes(m.name)}
                 canSelect={compare.length < MAX_COMPARE}
                 onToggle={() => toggleCompare(m.name)}
@@ -618,14 +649,14 @@ export default function Home() {
                 <TableHeader>
                   <TableRow className="border-zinc-800 bg-zinc-950 hover:bg-transparent">
                     <TableHead className="w-12 pl-4"><span className="sr-only">Compare</span></TableHead>
-                    <TableHead className={sortable} onClick={() => handleSort('name')}><div className="flex items-center">Model {sortIcon('name')}</div></TableHead>
-                    <TableHead className={th}>On {device?.manual ? 'your' : 'this'} computer</TableHead>
-                    <TableHead className={sortable} onClick={() => handleSort('speed')} title="Estimated tokens per second on your computer (about 0.75 words each)"><div className="flex items-center">Speed {sortIcon('speed')}</div></TableHead>
-                    <TableHead className={sortable} onClick={() => handleSort('size')}><div className="flex items-center">Size {sortIcon('size')}</div></TableHead>
-                    <TableHead className={`${th} hidden lg:table-cell`}>Capabilities</TableHead>
-                    <TableHead className={sortable} onClick={() => handleSort('downloads')}><div className="flex items-center">Downloads {sortIcon('downloads')}</div></TableHead>
-                    <TableHead className={`${sortable} hidden xl:table-cell`} onClick={() => handleSort('updated')}><div className="flex items-center">Updated {sortIcon('updated')}</div></TableHead>
-                    <TableHead className={`${sortable} hidden 2xl:table-cell`} onClick={() => handleSort('context')}><div className="flex items-center">Context {sortIcon('context')}</div></TableHead>
+                    <TableHead className={sortable} onClick={() => handleSort('name')}><Tip tip={COLUMN_HELP.model}><div className="flex items-center">Model {sortIcon('name')}</div></Tip></TableHead>
+                    <TableHead className={th}><Tip tip={COLUMN_HELP.fit}><span>On {device?.manual ? 'your' : 'this'} computer</span></Tip></TableHead>
+                    <TableHead className={sortable} onClick={() => handleSort('speed')}><Tip tip={COLUMN_HELP.speed}><div className="flex items-center">Speed {sortIcon('speed')}</div></Tip></TableHead>
+                    <TableHead className={sortable} onClick={() => handleSort('size')}><Tip tip={COLUMN_HELP.size}><div className="flex items-center">Size {sortIcon('size')}</div></Tip></TableHead>
+                    <TableHead className={`${th} hidden lg:table-cell`}><Tip tip={COLUMN_HELP.capabilities}><span>Capabilities</span></Tip></TableHead>
+                    <TableHead className={sortable} onClick={() => handleSort('downloads')}><Tip tip={COLUMN_HELP.downloads}><div className="flex items-center">Downloads {sortIcon('downloads')}</div></Tip></TableHead>
+                    <TableHead className={`${sortable} hidden xl:table-cell`} onClick={() => handleSort('updated')}><Tip tip={COLUMN_HELP.updated}><div className="flex items-center">Updated {sortIcon('updated')}</div></Tip></TableHead>
+                    <TableHead className={`${sortable} hidden 2xl:table-cell`} onClick={() => handleSort('context')}><Tip tip={COLUMN_HELP.context}><div className="flex items-center">Context {sortIcon('context')}</div></Tip></TableHead>
                     <TableHead className="w-14 pr-4"><span className="sr-only">Open</span></TableHead>
                   </TableRow>
                 </TableHeader>
@@ -646,48 +677,52 @@ export default function Home() {
                         className={`cursor-pointer border-zinc-900 transition-colors hover:bg-zinc-900/60 focus-visible:bg-zinc-900 focus-visible:outline-none ${picked ? 'bg-blue-500/5' : ''}`}
                       >
                         <TableCell className="w-12 py-3 pl-4">
-                          <input
-                            type="checkbox"
-                            checked={picked}
-                            disabled={!picked && compare.length >= MAX_COMPARE}
-                            onChange={() => toggleCompare(model.name)}
-                            onClick={e => e.stopPropagation()}
-                            aria-label={`Compare ${model.name}`}
-                            data-testid="compare-check"
-                            className="h-4 w-4 cursor-pointer accent-blue-500"
-                          />
+                          <Tip tip={{ title: 'Compare', lines: [!picked && compare.length >= MAX_COMPARE ? 'You can compare up to 4 models. Untick one first.' : 'Tick 2 to 4 models, then press Compare at the bottom to see them side by side.'] }}>
+                            <input
+                              type="checkbox"
+                              checked={picked}
+                              disabled={!picked && compare.length >= MAX_COMPARE}
+                              onChange={() => toggleCompare(model.name)}
+                              onClick={e => e.stopPropagation()}
+                              aria-label={`Compare ${model.name}`}
+                              data-testid="compare-check"
+                              className="h-4 w-4 cursor-pointer accent-blue-500"
+                            />
+                          </Tip>
                         </TableCell>
                         <TableCell className="py-3">
                           <div className="text-[15px] font-medium text-white" data-testid="model-name">
                             {owner ? (
                               <><button onClick={e => { e.stopPropagation(); patch({ owner, scope: 'community' }); }} title={`Show everything by ${owner}`} className="font-normal text-zinc-500 hover:text-zinc-300">{owner}/</button>{model.name.slice(owner.length + 1)}</>
                             ) : model.name}
-                            {isNewModel(model) && daysSince(model.firstSeen) <= 30 && <Badge className="ml-2 border-transparent bg-blue-500/20 text-[10px] uppercase text-blue-300">New</Badge>}
+                            {isNewModel(model) && daysSince(model.firstSeen) <= 30 && <Tip tip={{ title: 'New', lines: ['First seen on Ollama in the last 30 days.'] }}><Badge className="ml-2 border-transparent bg-blue-500/20 text-[10px] uppercase text-blue-300">New</Badge></Tip>}
                           </div>
                           <div className="mt-0.5 max-w-xl truncate text-sm text-zinc-500">{model.description}</div>
                         </TableCell>
-                        <TableCell className="py-3"><FitBadge fit={fit} /></TableCell>
-                        <TableCell className="py-3 text-sm" data-testid="speed-cell"><SpeedBadge tps={speedOfFit(fit)} compact /></TableCell>
+                        <TableCell className="py-3"><FitBadge fit={fit} machine={machine} /></TableCell>
+                        <TableCell className="py-3 text-sm" data-testid="speed-cell"><SpeedBadge tps={speedOfFit(fit)} compact fit={fit} machine={machine} /></TableCell>
                         <TableCell className="py-3">
-                          <div className="font-mono text-sm text-zinc-100 whitespace-nowrap">{sizeSummary(model)}</div>
-                          {(model.versions.length || model.tagsCount) ? <div className="text-xs text-zinc-500">{model.versions.length || model.tagsCount} versions</div> : null}
+                          <Tip block tip={explainSize(model, sizeSummary(model))}>
+                            <div className="font-mono text-sm text-zinc-100 whitespace-nowrap">{sizeSummary(model)}</div>
+                            {(model.versions.length || model.tagsCount) ? <div className="text-xs text-zinc-500">{model.versions.length || model.tagsCount} versions</div> : null}
+                          </Tip>
                         </TableCell>
                         <TableCell className="hidden py-3 lg:table-cell">
                           <div className="flex flex-nowrap items-center gap-1 whitespace-nowrap" title={model.capabilities.join(', ')}>
                             {model.capabilities.slice(0, 2).map(c => (
-                              <span key={c} className="inline-flex items-center gap-1 rounded-md bg-zinc-800/70 px-2 py-0.5 text-xs capitalize text-zinc-300">{capabilityIcon(c)}{c.toLowerCase()}</span>
+                              <Tip key={c} tip={explainCapability(c)}><span className="inline-flex items-center gap-1 rounded-md bg-zinc-800/70 px-2 py-0.5 text-xs capitalize text-zinc-300">{capabilityIcon(c)}{c.toLowerCase()}</span></Tip>
                             ))}
-                            {model.capabilities.length > 2 && <span className="px-1 text-xs text-zinc-500">+{model.capabilities.length - 2}</span>}
+                            {model.capabilities.length > 2 && <Tip tip={{ title: 'More capabilities', lines: [model.capabilities.slice(2).join(', ')] }}><span className="px-1 text-xs text-zinc-500">+{model.capabilities.length - 2}</span></Tip>}
                           </div>
                         </TableCell>
                         <TableCell className="py-3 text-sm tabular-nums text-zinc-200" data-testid="downloads">
-                          {model.pulls || '—'}
+                          <Tip tip={explainDownloads(model)}><span>{model.pulls || '—'}</span></Tip>
                           {filters.view === 'trending' && growthKnown && model.growth ? <div className="text-xs text-emerald-400">+{model.growth.toLocaleString()}</div> : null}
                         </TableCell>
-                        <TableCell className="hidden whitespace-nowrap py-3 text-sm text-zinc-400 xl:table-cell">{model.updated ? relativeTime(model.updated) : '—'}</TableCell>
-                        <TableCell className="hidden py-3 font-mono text-sm text-zinc-300 2xl:table-cell">{ctx ? (ctx >= 1000 ? `${ctx / 1000}M` : `${ctx}K`) : <span className="text-zinc-600">—</span>}</TableCell>
+                        <TableCell className="hidden whitespace-nowrap py-3 text-sm text-zinc-400 xl:table-cell"><Tip tip={explainUpdated(model)}><span>{model.updated ? relativeTime(model.updated) : '—'}</span></Tip></TableCell>
+                        <TableCell className="hidden py-3 font-mono text-sm text-zinc-300 2xl:table-cell"><Tip tip={explainContext(ctx)}><span>{ctx ? (ctx >= 1000 ? `${ctx / 1000}M` : `${ctx}K`) : <span className="text-zinc-600">—</span>}</span></Tip></TableCell>
                         <TableCell className="w-14 py-3 pr-4 text-right">
-                          <a href={model.url} target="_blank" rel="noopener noreferrer" onClick={e => e.stopPropagation()} aria-label={`Visit ${model.name}`} className="inline-flex h-9 w-9 items-center justify-center rounded-md text-zinc-400 hover:bg-zinc-800 hover:text-white"><ExternalLink className="h-4 w-4" /></a>
+                          <Tip tip={{ title: 'Open on ollama.com', lines: ['Opens this model\'s page in a new tab.'] }}><a href={model.url} target="_blank" rel="noopener noreferrer" onClick={e => e.stopPropagation()} aria-label={`Visit ${model.name}`} className="inline-flex h-9 w-9 items-center justify-center rounded-md text-zinc-400 hover:bg-zinc-800 hover:text-white"><ExternalLink className="h-4 w-4" /></a></Tip>
                         </TableCell>
                       </TableRow>
                     );
@@ -747,6 +782,7 @@ export default function Home() {
         <CompareDialog
           models={compared}
           fitOf={fitFor}
+          machine={machine}
           deviceLabel={device?.label || 'your computer'}
           relativeTime={relativeTime}
           onRemove={name => setCompare(c => c.filter(n => n !== name))}

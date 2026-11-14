@@ -8,6 +8,8 @@ import { describeSpeed, formatTps, speedTier, TIER_LABEL } from '@/lib/speed';
 import { formatCount, formatGB } from '@/lib/units';
 import { ownerOf, maxContextK } from '@/lib/filter';
 import type { Device } from '@/lib/device';
+import { explainCapability, type Machine } from '@/lib/explain';
+import { Tip } from './Tip';
 
 interface Props {
   model: ModelData;
@@ -71,6 +73,7 @@ export function ModelDrawer({ model, device, loadVersions, relativeTime, onClose
   const memory = device?.memoryGB ?? 10;
   const bandwidth = device?.bandwidthGBs ?? 0;
   const fit = useMemo(() => fitOf(withVersions, memory, bandwidth), [withVersions, memory, bandwidth]);
+  const machine: Machine | undefined = device ? { label: device.label, memoryGB: device.memoryGB, bandwidthGBs: device.bandwidthGBs } : undefined;
   const allVariants = useMemo(() => variantsOf(withVersions), [withVersions]);
   const recommended = useMemo(() => representatives(allVariants), [allVariants]);
   const [showAll, setShowAll] = useState(false);
@@ -108,8 +111,8 @@ export function ModelDrawer({ model, device, loadVersions, relativeTime, onClose
           <section className="rounded-xl border border-zinc-800 bg-zinc-900 p-4" data-testid="drawer-fit">
             <div className="mb-2 text-xs font-medium uppercase tracking-wide text-zinc-500">On {device?.label || 'your computer'}</div>
             <div className="flex flex-wrap items-center gap-3">
-              <FitBadge fit={fit} />
-              {fit.tps > 0 && <SpeedBadge tps={fit.tps} showTier />}
+              <FitBadge fit={fit} machine={machine} />
+              {fit.tps > 0 && <SpeedBadge tps={fit.tps} showTier fit={fit} machine={machine} />}
             </div>
             {fit.tps > 0 && tier && (
               <p className="mt-2 text-sm text-zinc-300" data-testid="drawer-speed-text">
@@ -161,7 +164,7 @@ export function ModelDrawer({ model, device, loadVersions, relativeTime, onClose
             </dl>
             {model.capabilities.length > 0 && (
               <div className="mt-3 flex flex-wrap gap-1.5">
-                {model.capabilities.map(c => <span key={c} className="rounded-md bg-zinc-800 px-2 py-0.5 text-xs capitalize text-zinc-200">{c.toLowerCase()}</span>)}
+                {model.capabilities.map(c => <Tip key={c} tip={explainCapability(c)}><span className="rounded-md bg-zinc-800 px-2 py-0.5 text-xs capitalize text-zinc-200">{c.toLowerCase()}</span></Tip>)}
               </div>
             )}
           </section>
@@ -188,7 +191,7 @@ export function ModelDrawer({ model, device, loadVersions, relativeTime, onClose
                       <span className="min-w-0 break-words font-mono text-[13px] text-zinc-100">{v.tag}{isBest && <span className="ml-2 rounded bg-emerald-500/20 px-1.5 py-0.5 font-sans text-[10px] font-semibold uppercase text-emerald-300">Best</span>}</span>
                       <span className="tabular-nums text-zinc-300">{v.estimated ? '~' : ''}{formatGB(v.sizeGB)}</span>
                       <span>
-                        {status === 'no' && fit.status !== 'cloud' ? <span className="text-xs text-red-400">Too big</span> : tps > 0 ? <SpeedBadge tps={tps} compact /> : <span className="text-zinc-600">—</span>}
+                        {status === 'no' && fit.status !== 'cloud' ? <span className="text-xs text-red-400">Too big</span> : tps > 0 ? <SpeedBadge tps={tps} compact fit={fit} machine={machine} /> : <span className="text-zinc-600">—</span>}
                         {status === 'tight' && tps > 0 && <span className="ml-1 text-[10px] text-amber-400">tight</span>}
                       </span>
                       <CopyButton text={exact ? `ollama run ${loaded?.find(x => x.name.endsWith(`:${v.tag}`))?.name || `${model.name}:${v.tag}`}` : runName(v.tag)} label={`Copy the command for ${v.tag}`} />

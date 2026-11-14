@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { ChevronDown, Check } from 'lucide-react';
+import { Tip as Tooltip } from './Tip';
+import type { Tip as TipContent } from '@/lib/explain';
 
 export interface Option {
   value: string;
@@ -21,13 +23,15 @@ interface Props {
   /** Text under the title in the phone sheet */
   help?: string;
   align?: 'left' | 'right';
+  /** Explanation shown on hover */
+  tip?: TipContent;
 }
 
 /**
  * A button that opens a list of choices: a small panel on a big screen, a bottom sheet on a phone.
  * Several things can be ticked at once when `multi` is set.
  */
-export function Dropdown({ id, label, icon, options, selected, onChange, multi = false, help, align = 'left' }: Props) {
+export function Dropdown({ id, label, icon, options, selected, onChange, multi = false, help, align = 'left', tip }: Props) {
   const [open, setOpen] = useState(false);
   const box = useRef<HTMLDivElement>(null);
 
@@ -51,6 +55,7 @@ export function Dropdown({ id, label, icon, options, selected, onChange, multi =
 
   return (
     <div className="relative" ref={box}>
+      <Tooltip tip={open ? null : tip}>
       <button
         onClick={() => setOpen(o => !o)}
         aria-expanded={open}
@@ -63,6 +68,7 @@ export function Dropdown({ id, label, icon, options, selected, onChange, multi =
         {multi && selected.length > 0 && <span className="rounded-full bg-white px-1.5 text-xs font-semibold text-black" data-testid={`${id}-count`}>{selected.length}</span>}
         <ChevronDown className={`h-4 w-4 text-zinc-500 transition-transform ${open ? 'rotate-180' : ''}`} />
       </button>
+      </Tooltip>
       {open && (
         <>
           <div className="fixed inset-0 z-40 bg-black/60 lg:hidden" onClick={() => setOpen(false)} />

@@ -2,6 +2,7 @@ import { ExternalLink, Clock, Download, Tag } from 'lucide-react';
 import type { ModelData } from '@/lib/types';
 import type { Fit } from '@/lib/fit';
 import { FitBadge } from './FitBadge';
+import type { Machine } from '@/lib/explain';
 import { SpeedBadge, speedOfFit } from './SpeedBadge';
 import { daysSince } from '@/lib/units';
 import { ownerOf, sizeSummary, isNewModel } from '@/lib/filter';
@@ -9,6 +10,7 @@ import { ownerOf, sizeSummary, isNewModel } from '@/lib/filter';
 interface Props {
   model: ModelData;
   fit: Fit;
+  machine?: Machine;
   selected: boolean;
   canSelect: boolean;
   onToggle: () => void;
@@ -18,7 +20,7 @@ interface Props {
 }
 
 /** One model as a card: the layout used on phones and small tablets. */
-export function ModelCard({ model, fit, selected, canSelect, onToggle, onOwner, onOpen, relativeTime }: Props) {
+export function ModelCard({ model, fit, machine, selected, canSelect, onToggle, onOwner, onOpen, relativeTime }: Props) {
   const owner = ownerOf(model);
   const shortName = owner ? model.name.slice(owner.length + 1) : model.name;
   const fresh = isNewModel(model) && daysSince(model.firstSeen) <= 30;
@@ -62,8 +64,8 @@ export function ModelCard({ model, fit, selected, canSelect, onToggle, onOwner, 
           </div>
           {model.description && <p className="mt-1 line-clamp-2 text-sm leading-snug text-zinc-400">{model.description}</p>}
           <div className="mt-2.5 flex flex-wrap items-center gap-1.5">
-            <FitBadge fit={fit} />
-            {speedOfFit(fit) > 0 && <SpeedBadge tps={speedOfFit(fit)} compact />}
+            <FitBadge fit={fit} machine={machine} />
+            {speedOfFit(fit) > 0 && <SpeedBadge tps={speedOfFit(fit)} compact fit={fit} machine={machine} />}
             {model.capabilities.filter(c => !(fit.status === 'cloud' && c.toLowerCase() === 'cloud')).slice(0, 3).map(c => (
               <span key={c} className="rounded-md border border-zinc-700 bg-zinc-800 px-2 py-0.5 text-xs capitalize text-zinc-200">{c.toLowerCase()}</span>
             ))}

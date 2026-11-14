@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Cpu, RefreshCw, Check } from 'lucide-react';
 import { DEVICE_PRESETS, type Device } from '@/lib/device';
+import { Tip } from './Tip';
 
 interface Props {
   device: Device | null;
@@ -33,6 +34,7 @@ export function DevicePicker({ device, onChange, fitOnly, onFitOnly }: Props) {
   return (
     <div className="flex items-center gap-2" data-testid="device-bar">
       <div className="relative min-w-0 flex-1 sm:flex-none" ref={box}>
+        <Tip block tip={open ? null : { title: 'Your computer', lines: [`We read your graphics card or chip from the browser: ${device.label}, about ${device.memoryGB} GB of usable memory, reading memory at about ${device.bandwidthGBs} GB/s. That decides which models fit and how fast they write. Click to correct it.`] }}>
         <button
           onClick={() => setOpen(o => !o)}
           aria-expanded={open}
@@ -46,6 +48,7 @@ export function DevicePicker({ device, onChange, fitOnly, onFitOnly }: Props) {
             <span className="text-zinc-400"> · ~{device.memoryGB} GB</span><span className="text-zinc-400 hidden sm:inline"> usable</span>
           </span>
         </button>
+        </Tip>
         {open && (
           <div
             role="dialog"
@@ -79,10 +82,12 @@ export function DevicePicker({ device, onChange, fitOnly, onFitOnly }: Props) {
           </div>
         )}
       </div>
+      <Tip tip={{ title: 'Only what runs', lines: ['Hide every model that is too big for your computer, or has no known size.'] }}>
       <label className="inline-flex shrink-0 items-center gap-2 h-10 sm:h-9 px-3 rounded-full border border-zinc-700 text-xs sm:text-sm text-zinc-300 cursor-pointer select-none hover:bg-zinc-900 has-[:checked]:border-emerald-700 has-[:checked]:text-emerald-300">
         <input type="checkbox" checked={fitOnly} onChange={e => onFitOnly(e.target.checked)} className="accent-emerald-500" data-testid="fit-only" />
         <span className="sm:hidden">Fits only</span><span className="hidden sm:inline">Only show what runs on it</span>
       </label>
+      </Tip>
     </div>
   );
 }

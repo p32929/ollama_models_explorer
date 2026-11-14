@@ -7,7 +7,11 @@ A modern, dark-themed UI for exploring and filtering Ollama AI models. This Next
 ![Ollama Models Explorer: coding models that run on an Apple M2 Pro, with estimated speed](docs/screenshots/desktop.png)
 
 <p align="center">
+  <img src="docs/screenshots/tooltips.png" width="49%" alt="Hover any number or badge for a plain-words explanation">
   <img src="docs/screenshots/details.png" width="49%" alt="Details panel: will it run, how fast, install command, every version">
+</p>
+
+<p align="center">
   <img src="docs/screenshots/compare.png" width="49%" alt="Comparing three models side by side">
 </p>
 
@@ -21,6 +25,8 @@ A modern, dark-themed UI for exploring and filtering Ollama AI models. This Next
 **Every model on Ollama.** The ~270 official models (with every version, size and context window) **and the 17,000+ community models** (`user/model-name`), in Official / Community / All tabs.
 
 **Will it run on my computer, and how fast?** The page finds your graphics card (or Apple chip) and memory by itself, with nothing to type, marks every model **Runs well / Tight fit / Too big / Cloud**, and estimates **tokens per second** (about 0.75 words each), for example `~27 tokens/s`. If the guess is wrong, one tap picks the closest computer. "Only show what runs on it" hides the rest. (Browsers hide exact specs, so it is an estimate. Speed = memory speed × 0.65 ÷ the model's size; mixture-of-experts models, which only use part of themselves for each word, are handled; expect ±30%. Official models use real download sizes, the rest are estimated from the parameter count.)
+
+**Hover anything** (a badge, a number, a column heading, a button) for a tooltip that says in plain words what it means and how it was worked out.
 
 **Click any model** for a details panel: will it run and how fast, the exact `ollama run` command (with a copy button, including the best version for your computer), every version with its size and speed, context window, downloads and more.
 
