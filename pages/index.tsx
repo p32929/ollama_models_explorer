@@ -407,12 +407,12 @@ export default function Home() {
 
       {/* Header: name, search, actions */}
       <header className="sticky top-0 z-30 border-b border-zinc-900 bg-black/85 backdrop-blur">
-        <div className="mx-auto flex w-full max-w-[1800px] flex-wrap items-center gap-x-4 gap-y-2.5 px-3 py-3 sm:px-4 lg:px-6">
+        <div className="mx-auto flex w-full max-w-[1800px] flex-wrap items-center gap-x-4 gap-y-2.5 px-3 py-3 sm:px-4 md:grid md:grid-cols-[minmax(0,1fr)_minmax(0,40rem)_minmax(0,1fr)] lg:px-6">
           <div className="min-w-0 flex-1 md:flex-none">
             <h1 className="truncate text-base font-semibold sm:text-lg">Ollama Models Explorer</h1>
             <p className="hidden text-xs text-zinc-500 lg:block">{allModels.length.toLocaleString()} models · {officialCount.toLocaleString()} official · {(allModels.length - officialCount).toLocaleString()} community</p>
           </div>
-          <div className="relative order-last w-full md:order-none md:mx-auto md:w-auto md:flex-1 md:max-w-2xl">
+          <div className="relative order-last w-full md:order-none">
             <Search className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-zinc-500" />
             <Input
               type="search"
@@ -423,7 +423,7 @@ export default function Home() {
               className="h-11 rounded-xl border-zinc-800 bg-zinc-900 pl-12 text-base text-white focus-visible:border-transparent focus-visible:ring-1 focus-visible:ring-white"
             />
           </div>
-          <div className="flex items-center gap-1.5 sm:gap-2">
+          <div className="flex items-center gap-1.5 sm:gap-2 md:justify-end">
             {nothingChosen && modelOfWeek && (
               <a href={modelOfWeek.url} target="_blank" rel="noopener noreferrer" data-testid="model-of-week" title={modelOfWeek.description} className="hidden items-center gap-1.5 rounded-md px-2.5 py-1.5 text-sm text-zinc-400 hover:bg-zinc-900 hover:text-white xl:inline-flex">
                 <Star className="h-3.5 w-3.5 text-amber-400" /><span>Model of the week:</span><span className="font-medium text-zinc-200">{modelOfWeek.name}</span>

@@ -21,7 +21,7 @@ const KNOWN_MOE: [RegExp, number, number][] = [
   [/deepseek-(r1|v3)/i, 671, 37],
   [/llama4|llama-4/i, 109, 17], [/llama4|llama-4/i, 400, 17],
   [/kimi-k2/i, 1000, 32],
-  [/qwen3-coder/i, 480, 35],
+  [/qwen3-coder/i, 30, 3.3], [/qwen3-coder/i, 480, 35],
   [/qwen3/i, 235, 22],
   [/glm-4\.5-air|glm4\.5-air/i, 106, 12], [/glm-4\.[567]|glm4\.[567]/i, 355, 32],
   [/minimax-m2/i, 230, 10],

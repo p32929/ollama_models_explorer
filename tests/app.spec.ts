@@ -445,6 +445,30 @@ test.describe('model details', () => {
   });
 });
 
+test('every row shows its size range, download size and type without opening it', async ({ page }) => {
+  await page.goto('/');
+  const llama = row(page, 'llama3.1');
+  await expect(llama).toContainText('8B – 405B');
+  await expect(llama).toContainText('GB');
+  await expect(llama.getByText('Dense', { exact: true })).toBeVisible();
+  await expect(row(page, 'tinyllama')).toContainText('1.1B');
+  // deepseek-r1 has a mixture-of-experts 671b next to ordinary smaller ones
+  await expect(row(page, 'deepseek-r1')).toContainText('1.5B – 671B');
+  await expect(row(page, 'deepseek-r1')).toContainText('Dense + MoE');
+});
+
+test('the search box stays in the same place on every tab', async ({ page }) => {
+  await page.goto('/');
+  const left = () => page.getByLabel('Search models').evaluate(el => Math.round(el.getBoundingClientRect().left));
+  const first = await left();
+  for (const v of ['new', 'trending', 'browse']) {
+    await page.getByTestId(`view-${v}`).click();
+    expect(await left()).toBe(first);
+  }
+  await choose(page, 'tasks', 'coding');
+  expect(await left()).toBe(first);
+});
+
 test.describe('tooltips', () => {
   const tip = (page: Page) => page.getByTestId('tooltip');
 
@@ -472,7 +496,7 @@ test.describe('tooltips', () => {
     await expect(tip(page)).toContainText('by about a third');
     await row(page, 'qwen2.5-coder').locator('svg.lucide-download').first().hover();
     await expect(tip(page)).toContainText('23,000,000 downloads');
-    await row(page, 'qwen2.5-coder').getByText('0.5b – 32b').hover();
+    await row(page, 'qwen2.5-coder').getByText('500M – 32B').hover();
     await expect(tip(page)).toContainText('billions of parameters');
     await row(page, 'deepseek-r1').getByText('thinking', { exact: true }).hover();
     await expect(tip(page)).toContainText('step by step');
