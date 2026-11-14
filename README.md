@@ -44,7 +44,7 @@ Or deploy it to Vercel, Netlify or any Node host. If you like it, a star on GitH
 </p>
 
 <p align="center">
-  <img src="docs/screenshots/tooltips.png" width="49%" alt="Hover any number or badge for a plain-words explanation">
+  <img src="docs/screenshots/tooltips.png" width="49%" alt="Hover any number or badge, like MoE, for a plain-words explanation">
   <img src="docs/screenshots/details.png" width="49%" alt="Details panel: can it run, how fast, install command, every version">
 </p>
 
@@ -66,9 +66,11 @@ Or deploy it to Vercel, Netlify or any Node host. If you like it, a star on GitH
 
 **Will it run on my computer, and how fast?** The page finds your graphics card (or Apple chip) and memory by itself, with nothing to type, marks every model **Can run well / Barely fits / Too big to run / Cloud**, and estimates **tokens per second** (about 0.75 words each), for example `~27 tokens/s`. If the guess is wrong, one tap picks the closest computer. "Only show models that can run on it" hides the rest. (Browsers hide exact specs, so it is an estimate. Speed = memory speed × 0.65 ÷ the model's size; mixture-of-experts models, which only use part of themselves for each word, are handled; expect ±30%. Official models use real download sizes, the rest are estimated from the parameter count.)
 
+**Every row shows the facts up front:** the size range (for example `8B – 405B`), the download size, and the type: **Dense** (all of the model works for every word) or **MoE** (mixture of experts: only a few parts work for each word, so it is faster than its size suggests). No clicking needed.
+
 **Hover anything** (a badge, a number, a tab, a button) for a tooltip that says in plain words what it means and how it was worked out.
 
-**Click any model** for a details panel: will it run and how fast, the exact `ollama run` command (with a copy button, including the best version for your computer), every version with its size and speed, context window, downloads and more.
+**Click any model** for a details panel (it shows a loading shimmer while the versions load): will it run and how fast, the exact `ollama run` command (with a copy button, including the best version for your computer), every version with its size and speed, context window, downloads and more.
 
 **Find the right one**
 - **I want to…** (pick several, a model must match all): Coding, Small & fast, Images, Reasoning, Embeddings, Translation, Chat & roleplay, Math, Tool use
