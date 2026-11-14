@@ -346,8 +346,8 @@ export default function Home() {
         <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
         <link rel="alternate" type="application/rss+xml" title="New Ollama models" href="/feed.xml" />
       </Head>
-      <div className="container mx-auto px-3 sm:px-4 py-3">
-        <div className="w-full mx-auto">
+      <div className="w-full px-3 sm:px-4 lg:px-6 py-3">
+        <div className="w-full">
           {/* Top bar */}
           <div className="flex justify-between items-center text-sm mb-3 gap-2">
             <a href="https://github.com/p32929/ollama_models_explorer" target="_blank" rel="noopener noreferrer" className="inline-flex items-center text-zinc-400 hover:text-white transition-colors min-h-10" aria-label="GitHub repository">
@@ -395,27 +395,48 @@ export default function Home() {
             </div>
           )}
 
-          {/* Search */}
-          <div className="w-full max-w-xl mx-auto relative mb-3">
-            <div className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-500"><Search className="h-5 w-5" /></div>
-            <Input
-              type="search"
-              placeholder="Search models..."
-              aria-label="Search models"
-              value={filters.q}
-              onChange={e => patch({ q: e.target.value })}
-              className="pl-12 pr-24 h-11 text-base sm:text-sm sm:h-10 bg-zinc-900 border-zinc-800 text-white rounded-md shadow-lg focus-visible:ring-1 focus-visible:ring-white focus-visible:border-transparent"
-            />
-            <div className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-zinc-500" data-testid="counter">
-              {results.length.toLocaleString()} of {allModels.length.toLocaleString()}
+          {/* Toolbar: search, your computer, sort and filters */}
+          <div className="mb-3 flex flex-col gap-2 lg:flex-row lg:items-center">
+            <div className="relative w-full lg:max-w-xl lg:flex-1">
+              <div className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-500"><Search className="h-5 w-5" /></div>
+              <Input
+                type="search"
+                placeholder="Search models..."
+                aria-label="Search models"
+                value={filters.q}
+                onChange={e => patch({ q: e.target.value })}
+                className="pl-12 pr-28 h-11 text-base sm:text-sm lg:h-10 bg-zinc-900 border-zinc-800 text-white rounded-md focus-visible:ring-1 focus-visible:ring-white focus-visible:border-transparent"
+              />
+              <div className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-zinc-500" data-testid="counter">
+                {results.length.toLocaleString()} of {allModels.length.toLocaleString()}
+              </div>
+            </div>
+            <div className="lg:ml-auto"><DevicePicker device={device} onChange={changeDevice} fitOnly={filters.fitOnly} onFitOnly={v => patch({ fitOnly: v })} /></div>
+            <div className="flex items-center gap-2">
+              <label className="inline-flex items-center gap-1.5 text-xs text-zinc-400">
+                <span>Sort</span>
+                <select
+                  value={filters.sort}
+                  onChange={e => patch({ sort: e.target.value as SortField, dir: ['name', 'size', 'versions'].includes(e.target.value) ? 'asc' : 'desc' })}
+                  aria-label="Sort by"
+                  data-testid="sort-select"
+                  className="h-10 lg:h-9 rounded-md border border-zinc-700 bg-zinc-900 px-3 text-sm text-zinc-200"
+                >
+                  {SORT_OPTIONS.map(o => <option key={o.id} value={o.id}>{o.label}</option>)}
+                </select>
+              </label>
+              <button
+                onClick={() => setShowFilters(true)}
+                data-testid="open-filters"
+                className="inline-flex h-10 lg:h-9 items-center gap-1.5 rounded-md border border-zinc-700 px-3.5 text-sm text-zinc-200 hover:bg-zinc-900"
+              >
+                <SlidersHorizontal className="h-4 w-4" /> Filters{filterCount > 0 && <span className="rounded-full bg-white px-1.5 text-xs font-semibold text-black">{filterCount}</span>}
+              </button>
             </div>
           </div>
 
-          {/* Your computer */}
-          <div className="mb-3"><DevicePicker device={device} onChange={changeDevice} fitOnly={filters.fitOnly} onFitOnly={v => patch({ fitOnly: v })} /></div>
-
-          {/* Views and scope */}
-          <div className="mb-3 flex flex-wrap items-center justify-center gap-x-4 gap-y-2">
+          {/* View, scope and model of the week */}
+          <div className="mb-3 flex flex-wrap items-center gap-x-4 gap-y-2">
             <div className="inline-flex max-w-full overflow-x-auto rounded-lg border border-zinc-800 bg-zinc-950 p-0.5" role="tablist" aria-label="View">
               {VIEWS.map(v => (
                 <button
@@ -444,11 +465,23 @@ export default function Home() {
                 </button>
               ))}
             </div>
+            {nothingChosen && modelOfWeek && (
+              <div className="flex w-full items-center gap-3 rounded-xl border border-zinc-800 bg-zinc-900 p-3 lg:ml-auto lg:w-auto lg:rounded-md lg:border-0 lg:bg-transparent lg:p-0" data-testid="model-of-week">
+                <Star className="h-4 w-4 shrink-0 text-amber-400 lg:h-3.5 lg:w-3.5" />
+                <div className="min-w-0 flex-1 lg:flex-none">
+                  <div className="text-[11px] font-semibold uppercase tracking-wide text-amber-400 lg:hidden">Model of the week</div>
+                  <div className="font-semibold text-white break-words lg:text-sm lg:font-medium lg:text-zinc-300"><span className="hidden text-amber-400 lg:inline">Model of the week: </span>{modelOfWeek.name}</div>
+                  <p className="line-clamp-1 text-sm text-zinc-400 lg:hidden">{modelOfWeek.description}</p>
+                </div>
+                <a href={modelOfWeek.url} target="_blank" rel="noopener noreferrer" title={modelOfWeek.description} aria-label={`Open ${modelOfWeek.name}`} className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-zinc-300 hover:bg-zinc-800 lg:h-7 lg:w-7"><ExternalLink className="h-4 w-4 lg:h-3.5 lg:w-3.5" /></a>
+              </div>
+            )}
           </div>
 
-          {/* What do you want to do? */}
-          <div className="mb-3 -mx-3 sm:mx-0">
-            <div className="flex gap-1.5 overflow-x-auto px-3 sm:px-0 sm:flex-wrap sm:justify-center pb-1" data-testid="quick-picks" style={{ scrollbarWidth: 'none' }}>
+          {/* What do you want to do? + capabilities: one tidy row on a big screen, two scrolling rows on a phone */}
+          <div className="mb-3 -mx-3 sm:mx-0 lg:flex lg:flex-wrap lg:items-center lg:gap-x-2 lg:gap-y-2">
+            <div className="flex gap-1.5 overflow-x-auto px-3 sm:px-0 lg:flex-wrap pb-1 lg:pb-0" data-testid="quick-picks" style={{ scrollbarWidth: 'none' }}>
+              <span className="hidden shrink-0 self-center pr-1 text-sm text-zinc-500 lg:block">I want to:</span>
               {TASKS.map(t => (
                 <button
                   key={t.id}
@@ -462,11 +495,8 @@ export default function Home() {
                 </button>
               ))}
             </div>
-          </div>
-
-          {/* Capabilities, sort and more filters */}
-          <div className="mb-3 -mx-3 sm:mx-0">
-            <div className="flex gap-1.5 overflow-x-auto px-3 sm:px-0 sm:flex-wrap sm:justify-center pb-1" data-testid="capabilities" style={{ scrollbarWidth: 'none' }}>
+            <span className="mx-2 hidden h-6 w-px bg-zinc-800 2xl:block" />
+            <div className="mt-2 flex gap-1.5 overflow-x-auto px-3 sm:px-0 lg:mt-0 lg:flex-wrap pb-1 lg:pb-0" data-testid="capabilities" style={{ scrollbarWidth: 'none' }}>
               {allCapabilities.map(c => (
                 <Button
                   key={c}
@@ -480,31 +510,10 @@ export default function Home() {
               ))}
             </div>
           </div>
-          <div className="mb-4 flex items-center justify-center gap-2">
-            <label className="inline-flex items-center gap-1.5 text-xs text-zinc-400">
-              <span>Sort</span>
-              <select
-                value={filters.sort}
-                onChange={e => patch({ sort: e.target.value as SortField, dir: ['name', 'size', 'versions'].includes(e.target.value) ? 'asc' : 'desc' })}
-                aria-label="Sort by"
-                data-testid="sort-select"
-                className="h-9 rounded-full border border-zinc-700 bg-zinc-900 px-3 text-sm text-zinc-200"
-              >
-                {SORT_OPTIONS.map(o => <option key={o.id} value={o.id}>{o.label}</option>)}
-              </select>
-            </label>
-            <button
-              onClick={() => setShowFilters(true)}
-              data-testid="open-filters"
-              className="inline-flex h-9 items-center gap-1.5 rounded-full border border-zinc-700 px-3.5 text-sm text-zinc-200 hover:bg-zinc-900"
-            >
-              <SlidersHorizontal className="h-4 w-4" /> Filters{filterCount > 0 && <span className="rounded-full bg-white px-1.5 text-xs font-semibold text-black">{filterCount}</span>}
-            </button>
-          </div>
 
           {/* Active choices */}
           {(filters.cap || filters.task || filters.owner || filters.updatedDays > 0 || filters.maxGB > 0 || filters.minContextK > 0 || filters.dedupe) && (
-            <div className="mb-3 flex flex-wrap items-center justify-center gap-1.5 text-xs" data-testid="active-filters">
+            <div className="mb-3 flex flex-wrap items-center gap-1.5 text-xs" data-testid="active-filters">
               {[
                 filters.task && `Task: ${taskLabel}`,
                 filters.cap && `Capability: ${filters.cap}`,
@@ -519,7 +528,7 @@ export default function Home() {
           )}
 
           {filters.q.trim().length >= 2 && filters.scope !== 'official' && (
-            <div className="text-center text-xs text-zinc-400 mb-3" data-testid="live-search">
+            <div className="text-xs text-zinc-400 mb-3" data-testid="live-search">
               <span>Can&apos;t find it? The saved list can be a few days old. </span>
               <button onClick={runLiveSearch} disabled={liveSearching !== null} className="text-blue-400 hover:text-blue-300 underline underline-offset-2 disabled:opacity-60">
                 {liveSearching ? 'Searching…' : `Search ollama.com live for “${filters.q.trim()}”`}
@@ -529,26 +538,13 @@ export default function Home() {
           )}
 
           {filters.view === 'trending' && (
-            <p className="mb-3 text-center text-xs text-zinc-500" data-testid="trending-note">
+            <p className="mb-3 text-xs text-zinc-500" data-testid="trending-note">
               {growthKnown
                 ? 'Ranked by downloads gained since the last weekly update.'
                 : 'Ranked by downloads and recent updates. Weekly download growth appears after the next list update.'}
             </p>
           )}
-          {filters.view === 'new' && <p className="mb-3 text-center text-xs text-zinc-500">Models added or updated in the last two weeks, newest first.</p>}
-
-          {/* Model of the week */}
-          {nothingChosen && modelOfWeek && (
-            <div className="mb-3 flex items-center gap-3 rounded-xl border border-zinc-800 bg-gradient-to-r from-zinc-900 to-zinc-950 p-3 sm:p-3.5" data-testid="model-of-week">
-              <Star className="h-5 w-5 shrink-0 text-amber-400" />
-              <div className="min-w-0 flex-1">
-                <div className="text-[11px] font-semibold uppercase tracking-wide text-amber-400">Model of the week</div>
-                <div className="font-semibold text-white break-words">{modelOfWeek.name}</div>
-                <p className="line-clamp-1 sm:line-clamp-2 text-sm text-zinc-400">{modelOfWeek.description}</p>
-              </div>
-              <a href={modelOfWeek.url} target="_blank" rel="noopener noreferrer" aria-label={`Open ${modelOfWeek.name}`} className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-zinc-300 hover:bg-zinc-800"><ExternalLink className="h-4 w-4" /></a>
-            </div>
-          )}
+          {filters.view === 'new' && <p className="mb-3 text-xs text-zinc-500">Models added or updated in the last two weeks, newest first.</p>}
 
           {/* Results */}
           {allModels.length === 0 && !isPending && !refreshing ? (

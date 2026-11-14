@@ -31,7 +31,7 @@ export function DevicePicker({ device, onChange, fitOnly, onFitOnly }: Props) {
   const how = device.manual ? 'you chose this' : device.confidence === 'detected' ? 'detected' : device.confidence === 'estimated' ? 'estimated from your hardware' : 'a guess';
 
   return (
-    <div className="flex items-center justify-center gap-2" data-testid="device-bar">
+    <div className="flex items-center gap-2" data-testid="device-bar">
       <div className="relative min-w-0 flex-1 sm:flex-none" ref={box}>
         <button
           onClick={() => setOpen(o => !o)}
@@ -50,7 +50,7 @@ export function DevicePicker({ device, onChange, fitOnly, onFitOnly }: Props) {
           <div
             role="dialog"
             aria-label="Choose your computer"
-            className="absolute left-0 sm:left-1/2 sm:-translate-x-1/2 mt-2 z-40 w-[min(calc(100vw-1.5rem),22rem)] rounded-xl border border-zinc-700 bg-zinc-900 shadow-2xl p-3 text-left"
+            className="absolute left-0 lg:left-auto lg:right-0 mt-2 z-40 w-[min(calc(100vw-1.5rem),22rem)] rounded-xl border border-zinc-700 bg-zinc-900 shadow-2xl p-3 text-left"
           >
             <p className="text-xs text-zinc-400 px-1 pb-2">
               We read your hardware from the browser ({how}). Browsers hide exact memory, so if this looks wrong, pick the closest:
