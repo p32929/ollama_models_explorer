@@ -26,7 +26,7 @@ test('models are cards, not a table, and nothing scrolls sideways', async ({ pag
 test('the first model is visible without scrolling past a wall of controls', async ({ page }) => {
   await page.goto('/');
   const top = await page.getByTestId('model-card').first().evaluate(el => el.getBoundingClientRect().top);
-  expect(top).toBeLessThan(560);
+  expect(top).toBeLessThan(520);
 });
 
 test('everything you tap is big enough to tap', async ({ page }) => {
@@ -36,7 +36,8 @@ test('everything you tap is big enough to tap', async ({ page }) => {
     page.getByTestId('device-chip'),
     page.getByTestId('view-new'),
     page.getByTestId('scope-official'),
-    page.getByTestId('task-coding'),
+    page.getByTestId('open-tasks'),
+    page.getByTestId('open-caps'),
     page.getByTestId('open-filters'),
     page.getByTestId('sort-select'),
     card(page, 'llama3.1').getByRole('link', { name: /Open llama3.1/ }),
@@ -51,13 +52,26 @@ test('everything you tap is big enough to tap', async ({ page }) => {
   }
 });
 
-test('the computer chip, quick picks and capabilities are one-row scrollers, not walls', async ({ page }) => {
+test('the filter bar is one row, and drop-downs open as bottom sheets', async ({ page }) => {
   await page.goto('/');
-  for (const id of ['quick-picks', 'capabilities']) {
-    const heights = await page.getByTestId(id).evaluate(el => ({ h: el.getBoundingClientRect().height, scrolls: el.scrollWidth > el.clientWidth }));
-    expect(heights.h, id).toBeLessThan(60);
-    expect(heights.scrolls, `${id} scrolls sideways inside itself`).toBe(true);
-  }
+  const bar = await page.getByTestId('filter-bar').evaluate(el => ({ h: el.getBoundingClientRect().height }));
+  expect(bar.h, 'filter bar is a single row').toBeLessThan(60);
+  expect(await noSidewaysScroll(page)).toBe(true);
+  await page.getByTestId('open-tasks').tap();
+  const sheet = page.getByRole('dialog', { name: 'I want to' });
+  const box = await sheet.boundingBox();
+  expect(box!.x).toBe(0);
+  expect(Math.round(box!.width)).toBe(390);
+  expect(Math.round(box!.y + box!.height)).toBe(844); // sits on the bottom edge
+  expect(box!.height).toBeLessThanOrEqual(844 * 0.8);
+  // several can be ticked, then Done
+  await page.getByTestId('tasks-coding').tap();
+  await page.getByTestId('tasks-small').tap();
+  await expect(page.getByTestId('tasks-count')).toHaveText('2');
+  await sheet.getByRole('button', { name: 'Done' }).tap();
+  await expect(sheet).toBeHidden();
+  await expect(page.getByTestId('active-filters')).toContainText('Coding');
+  await expect(page.getByTestId('active-filters')).toContainText('Small & fast');
   expect(await noSidewaysScroll(page)).toBe(true);
 });
 

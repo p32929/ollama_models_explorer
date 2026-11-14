@@ -10,6 +10,7 @@ const num = (v: string | string[] | undefined, fallback = 0) => { const n = Numb
  * Public JSON API over the full list of Ollama models.
  *
  *   GET /api/v1/models?q=coder&scope=community&cap=tools&sort=downloads&order=desc&limit=50&offset=0
+ *   cap= and task= take several values separated by commas (the model must match all of them)
  *   also: owner=, updated=<days>, max_gb=, min_context_k=, new=1, memory_gb=<GB> (adds "fit" for that much memory)
  */
 export default function handler(req: NextApiRequest, res: NextApiResponse) {
@@ -25,8 +26,8 @@ export default function handler(req: NextApiRequest, res: NextApiResponse) {
     q: one(req.query.q),
     scope: (['official', 'community'].includes(scopeParam) ? scopeParam : 'all') as Scope,
     view: one(req.query.new) === '1' ? 'new' : 'browse',
-    cap: one(req.query.cap).toLowerCase() || null,
-    task: one(req.query.task) || null,
+    caps: one(req.query.cap).toLowerCase().split(',').filter(Boolean),
+    tasks: one(req.query.task).split(',').filter(Boolean),
     sort,
     dir: one(req.query.order) === 'asc' ? 'asc' : 'desc',
     updatedDays: num(req.query.updated),

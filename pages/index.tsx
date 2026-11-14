@@ -10,6 +10,7 @@ import { FitBadge } from '@/components/FitBadge';
 import { DevicePicker } from '@/components/DevicePicker';
 import { CompareDialog } from '@/components/CompareDialog';
 import { FilterSheet } from '@/components/FilterSheet';
+import { Dropdown } from '@/components/Dropdown';
 import {
   ExternalLink, Search, ArrowUpDown, ArrowUp, ArrowDown, Code2, Brain, Gauge, Tag, Clock, ImageIcon, MessagesSquare,
   Sparkles, Github, RefreshCw, Info, SlidersHorizontal, GitCompare, Sun, Moon, Flame, Rss, Braces, Star, X,
@@ -270,10 +271,10 @@ export default function Home() {
   const officialCount = useMemo(() => allModels.filter(m => !isCommunity(m)).length, [allModels]);
   const growthKnown = useMemo(() => hasGrowthData(allModels), [allModels]);
 
-  const allCapabilities = useMemo(() => {
+  const capabilityCounts = useMemo(() => {
     const counts = new Map<string, number>();
     allModels.forEach(m => m.capabilities.forEach(c => counts.set(c.toLowerCase(), (counts.get(c.toLowerCase()) || 0) + 1)));
-    return Array.from(counts.entries()).sort((a, b) => b[1] - a[1]).slice(0, 8).map(([c]) => c).sort();
+    return Array.from(counts.entries()).sort((a, b) => b[1] - a[1]).slice(0, 10);
   }, [allModels]);
 
   // ---- the list ----
@@ -319,24 +320,39 @@ export default function Home() {
     return filters.dir === 'asc' ? <ArrowUp className="ml-2 h-4 w-4 text-blue-500" /> : <ArrowDown className="ml-2 h-4 w-4 text-blue-500" />;
   };
 
-  const filterCount = activeFilterCount({ ...filters, cap: null, task: null, fitOnly: false }); // those three have their own buttons
+  const filterCount = activeFilterCount({ ...filters, caps: [], tasks: [], fitOnly: false }); // those have their own controls
   const nothingChosen = !filters.q && !activeFilterCount(filters) && filters.scope === 'all' && filters.view === 'browse';
 
   // ---- loading skeleton ----
   if (initialLoading) {
     return (
       <div className="min-h-screen bg-black text-white">
-        <div className="container mx-auto px-4 py-10">
-          <div className="h-11 max-w-xl mx-auto rounded-lg bg-zinc-800/50 animate-pulse mb-6" />
-          <div className="space-y-3 max-w-5xl mx-auto">
-            {[1, 2, 3, 4, 5].map(i => <div key={i} className="h-20 rounded-xl bg-zinc-900 animate-pulse" />)}
+        <div className="w-full px-4 py-10 lg:px-6">
+          <div className="h-11 max-w-2xl rounded-lg bg-zinc-800/50 animate-pulse mb-6" />
+          <div className="space-y-3">
+            {[1, 2, 3, 4, 5].map(i => <div key={i} className="h-16 rounded-xl bg-zinc-900 animate-pulse" />)}
           </div>
         </div>
       </div>
     );
   }
 
-  const taskLabel = TASKS.find(t => t.id === filters.task)?.label;
+  const taskOptions = TASKS.map(t => ({ value: t.id, label: t.label, hint: t.hint }));
+  const capabilityOptions = capabilityCounts.map(([c, n]) => ({ value: c, label: c.charAt(0).toUpperCase() + c.slice(1), icon: capabilityIcon(c), count: n }));
+
+  // everything that is narrowing the list, each removable on its own
+  const chips: { key: string; label: string; remove: () => void }[] = [
+    ...filters.tasks.map(id => ({ key: `task-${id}`, label: TASKS.find(t => t.id === id)?.label || id, remove: () => patch({ tasks: filters.tasks.filter(t => t !== id) }) })),
+    ...filters.caps.map(c => ({ key: `cap-${c}`, label: c.charAt(0).toUpperCase() + c.slice(1), remove: () => patch({ caps: filters.caps.filter(x => x !== c) }) })),
+    ...(filters.owner ? [{ key: 'owner', label: `By ${filters.owner}`, remove: () => patch({ owner: '' }) }] : []),
+    ...(filters.updatedDays > 0 ? [{ key: 'upd', label: `Updated in ${filters.updatedDays} days`, remove: () => patch({ updatedDays: 0 }) }] : []),
+    ...(filters.maxGB > 0 ? [{ key: 'max', label: `Under ${filters.maxGB} GB`, remove: () => patch({ maxGB: 0 }) }] : []),
+    ...(filters.minContextK > 0 ? [{ key: 'ctx', label: `${filters.minContextK}K+ context`, remove: () => patch({ minContextK: 0 }) }] : []),
+    ...(filters.dedupe ? [{ key: 'dedupe', label: 'No near-duplicates', remove: () => patch({ dedupe: false }) }] : []),
+  ];
+
+  const th = 'py-3 text-xs font-medium uppercase tracking-wide text-zinc-500';
+  const sortable = `${th} cursor-pointer select-none hover:text-white transition-colors`;
 
   return (
     <div className="min-h-screen bg-black text-white pb-24">
@@ -346,361 +362,300 @@ export default function Home() {
         <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
         <link rel="alternate" type="application/rss+xml" title="New Ollama models" href="/feed.xml" />
       </Head>
-      <div className="w-full px-3 sm:px-4 lg:px-6 py-3">
-        <div className="w-full">
-          {/* Top bar */}
-          <div className="flex justify-between items-center text-sm mb-3 gap-2">
-            <a href="https://github.com/p32929/ollama_models_explorer" target="_blank" rel="noopener noreferrer" className="inline-flex items-center text-zinc-400 hover:text-white transition-colors min-h-10" aria-label="GitHub repository">
-              <Github className="h-4 w-4 sm:mr-1" />
-              <span className="hidden sm:inline">GitHub Repository</span>
-            </a>
-            <div className="flex items-center gap-2 sm:gap-3">
-              {lastUpdated && (
-                <div className="hidden sm:flex items-center text-zinc-500 text-xs">
-                  <Info className="h-3 w-3 mr-1" />
-                  <span>Updated {cacheAge !== null ? `${cacheAge} min ago` : new Date(lastUpdated).toLocaleString()}</span>
-                </div>
-              )}
-              <button onClick={toggleTheme} aria-label={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'} data-testid="theme-toggle" className="flex h-10 w-10 items-center justify-center rounded-md border border-zinc-700 bg-zinc-800 text-zinc-200 hover:bg-zinc-700">
-                {theme === 'dark' ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
-              </button>
-              <Button variant="outline" size="sm" onClick={refreshData} disabled={refreshing || isPending} className="h-10 text-xs bg-zinc-800 border-zinc-700 hover:bg-zinc-700 text-white disabled:opacity-50">
-                <RefreshCw className={`h-3 w-3 mr-1 ${(refreshing || isPending) ? 'animate-spin' : ''}`} />
-                {isPending ? 'Updating...' : refreshing ? 'Starting...' : <><span className="sm:hidden">Refresh</span><span className="hidden sm:inline">Refresh Data</span></>}
-              </Button>
-            </div>
+      <div className="w-full px-3 sm:px-4 lg:px-6">
+        {/* Header */}
+        <header className="flex items-center justify-between gap-3 py-3">
+          <div className="min-w-0">
+            <h1 className="truncate text-base font-semibold sm:text-lg">Ollama Models Explorer</h1>
+            <p className="hidden text-xs text-zinc-500 sm:block">
+              {allModels.length.toLocaleString()} models · {officialCount.toLocaleString()} official · {(allModels.length - officialCount).toLocaleString()} community
+            </p>
           </div>
-
-          {(isPending || refreshing) && (
-            <div className="mb-4 bg-zinc-900 border border-zinc-800 rounded-lg p-4">
-              {progress && isPending && (
-                <div className="mb-3">
-                  <div className="flex justify-between text-sm text-zinc-300 mb-1"><span>{progress.currentTask}</span><span>{Math.round(progress.current)}%</span></div>
-                  <div className="w-full bg-zinc-800 rounded-full h-2"><div className="bg-blue-500 h-2 rounded-full transition-all duration-300" style={{ width: `${progress.current}%` }} /></div>
-                </div>
-              )}
-              {logs.length > 0 && (
-                <div className="space-y-1">
-                  <h4 className="text-sm font-medium text-zinc-300 mb-2">Scraping Activity:</h4>
-                  <div className="max-h-32 overflow-y-auto space-y-1 text-xs">
-                    {logs.slice(-8).map((log, index) => (
-                      <div key={index} className={`flex items-start gap-2 ${log.type === 'error' ? 'text-red-400' : log.type === 'warning' ? 'text-yellow-400' : log.type === 'success' ? 'text-green-400' : 'text-zinc-400'}`}>
-                        <span className="text-zinc-500 shrink-0">{new Date(log.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}</span>
-                        <span>{log.message}</span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* Toolbar: search, your computer, sort and filters */}
-          <div className="mb-3 flex flex-col gap-2 lg:flex-row lg:items-center">
-            <div className="relative w-full lg:max-w-xl lg:flex-1">
-              <div className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-500"><Search className="h-5 w-5" /></div>
-              <Input
-                type="search"
-                placeholder="Search models..."
-                aria-label="Search models"
-                value={filters.q}
-                onChange={e => patch({ q: e.target.value })}
-                className="pl-12 pr-28 h-11 text-base sm:text-sm lg:h-10 bg-zinc-900 border-zinc-800 text-white rounded-md focus-visible:ring-1 focus-visible:ring-white focus-visible:border-transparent"
-              />
-              <div className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-zinc-500" data-testid="counter">
-                {results.length.toLocaleString()} of {allModels.length.toLocaleString()}
-              </div>
-            </div>
-            <div className="lg:ml-auto"><DevicePicker device={device} onChange={changeDevice} fitOnly={filters.fitOnly} onFitOnly={v => patch({ fitOnly: v })} /></div>
-            <div className="flex items-center gap-2">
-              <label className="inline-flex items-center gap-1.5 text-xs text-zinc-400">
-                <span>Sort</span>
-                <select
-                  value={filters.sort}
-                  onChange={e => patch({ sort: e.target.value as SortField, dir: ['name', 'size', 'versions'].includes(e.target.value) ? 'asc' : 'desc' })}
-                  aria-label="Sort by"
-                  data-testid="sort-select"
-                  className="h-10 lg:h-9 rounded-md border border-zinc-700 bg-zinc-900 px-3 text-sm text-zinc-200"
-                >
-                  {SORT_OPTIONS.map(o => <option key={o.id} value={o.id}>{o.label}</option>)}
-                </select>
-              </label>
-              <button
-                onClick={() => setShowFilters(true)}
-                data-testid="open-filters"
-                className="inline-flex h-10 lg:h-9 items-center gap-1.5 rounded-md border border-zinc-700 px-3.5 text-sm text-zinc-200 hover:bg-zinc-900"
-              >
-                <SlidersHorizontal className="h-4 w-4" /> Filters{filterCount > 0 && <span className="rounded-full bg-white px-1.5 text-xs font-semibold text-black">{filterCount}</span>}
-              </button>
-            </div>
-          </div>
-
-          {/* View, scope and model of the week */}
-          <div className="mb-3 flex flex-wrap items-center gap-x-4 gap-y-2">
-            <div className="inline-flex max-w-full overflow-x-auto rounded-lg border border-zinc-800 bg-zinc-950 p-0.5" role="tablist" aria-label="View">
-              {VIEWS.map(v => (
-                <button
-                  key={v.id}
-                  role="tab"
-                  aria-selected={filters.view === v.id}
-                  data-testid={`view-${v.id}`}
-                  onClick={() => patch({ view: v.id })}
-                  className={`inline-flex h-9 items-center gap-1.5 whitespace-nowrap rounded-md px-3.5 text-sm font-medium transition-colors ${filters.view === v.id ? 'bg-white text-black' : 'text-zinc-400 hover:text-white'}`}
-                >
-                  {v.icon}{v.label}
-                </button>
-              ))}
-            </div>
-            <div className="flex max-w-full items-center gap-1 overflow-x-auto" role="tablist" aria-label="Which models to show">
-              {([['all', 'All', allModels.length], ['official', 'Official', officialCount], ['community', 'Community', allModels.length - officialCount]] as const).map(([value, label, count]) => (
-                <button
-                  key={value}
-                  role="tab"
-                  aria-selected={filters.scope === value}
-                  data-testid={`scope-${value}`}
-                  onClick={() => patch({ scope: value })}
-                  className={`h-9 whitespace-nowrap rounded-md px-3 text-xs sm:text-sm font-medium transition-colors ${filters.scope === value ? 'bg-zinc-700 text-white' : 'text-zinc-400 hover:text-white hover:bg-zinc-900'}`}
-                >
-                  {label} <span className="text-zinc-500">{count.toLocaleString()}</span>
-                </button>
-              ))}
-            </div>
+          <div className="flex items-center gap-1.5 sm:gap-2">
             {nothingChosen && modelOfWeek && (
-              <div className="flex w-full items-center gap-3 rounded-xl border border-zinc-800 bg-zinc-900 p-3 lg:ml-auto lg:w-auto lg:rounded-md lg:border-0 lg:bg-transparent lg:p-0" data-testid="model-of-week">
-                <Star className="h-4 w-4 shrink-0 text-amber-400 lg:h-3.5 lg:w-3.5" />
-                <div className="min-w-0 flex-1 lg:flex-none">
-                  <div className="text-[11px] font-semibold uppercase tracking-wide text-amber-400 lg:hidden">Model of the week</div>
-                  <div className="font-semibold text-white break-words lg:text-sm lg:font-medium lg:text-zinc-300"><span className="hidden text-amber-400 lg:inline">Model of the week: </span>{modelOfWeek.name}</div>
-                  <p className="line-clamp-1 text-sm text-zinc-400 lg:hidden">{modelOfWeek.description}</p>
+              <a
+                href={modelOfWeek.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                data-testid="model-of-week"
+                title={modelOfWeek.description}
+                className="hidden items-center gap-1.5 rounded-md px-2.5 py-1.5 text-sm text-zinc-400 hover:bg-zinc-900 hover:text-white md:inline-flex"
+              >
+                <Star className="h-3.5 w-3.5 text-amber-400" />
+                <span>Model of the week:</span>
+                <span className="font-medium text-zinc-200">{modelOfWeek.name}</span>
+              </a>
+            )}
+            {lastUpdated && (
+              <span className="hidden items-center text-xs text-zinc-500 xl:flex"><Info className="mr-1 h-3 w-3" />Updated {cacheAge !== null ? `${cacheAge} min ago` : new Date(lastUpdated).toLocaleString()}</span>
+            )}
+            <a href="https://github.com/p32929/ollama_models_explorer" target="_blank" rel="noopener noreferrer" aria-label="GitHub repository" className="flex h-10 w-10 items-center justify-center rounded-md border border-zinc-800 text-zinc-300 hover:bg-zinc-900 hover:text-white lg:h-9 lg:w-9">
+              <Github className="h-4 w-4" />
+            </a>
+            <button onClick={toggleTheme} aria-label={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'} data-testid="theme-toggle" className="flex h-10 w-10 items-center justify-center rounded-md border border-zinc-800 text-zinc-300 hover:bg-zinc-900 hover:text-white lg:h-9 lg:w-9">
+              {theme === 'dark' ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+            </button>
+            <Button variant="outline" size="sm" onClick={refreshData} disabled={refreshing || isPending} title="Re-read the official models with all their versions" className="h-10 lg:h-9 border-zinc-800 bg-transparent text-zinc-300 hover:bg-zinc-900 hover:text-white disabled:opacity-50">
+              <RefreshCw className={`h-3.5 w-3.5 ${(refreshing || isPending) ? 'animate-spin' : ''}`} />
+              <span>{isPending ? 'Updating...' : refreshing ? 'Starting...' : 'Refresh'}</span>
+            </Button>
+          </div>
+        </header>
+
+        {(isPending || refreshing) && (
+          <div className="mb-4 bg-zinc-900 border border-zinc-800 rounded-lg p-4">
+            {progress && isPending && (
+              <div className="mb-3">
+                <div className="flex justify-between text-sm text-zinc-300 mb-1"><span>{progress.currentTask}</span><span>{Math.round(progress.current)}%</span></div>
+                <div className="w-full bg-zinc-800 rounded-full h-2"><div className="bg-blue-500 h-2 rounded-full transition-all duration-300" style={{ width: `${progress.current}%` }} /></div>
+              </div>
+            )}
+            {logs.length > 0 && (
+              <div className="space-y-1">
+                <h4 className="text-sm font-medium text-zinc-300 mb-2">Scraping Activity:</h4>
+                <div className="max-h-32 overflow-y-auto space-y-1 text-xs">
+                  {logs.slice(-8).map((log, index) => (
+                    <div key={index} className={`flex items-start gap-2 ${log.type === 'error' ? 'text-red-400' : log.type === 'warning' ? 'text-yellow-400' : log.type === 'success' ? 'text-green-400' : 'text-zinc-400'}`}>
+                      <span className="text-zinc-500 shrink-0">{new Date(log.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}</span>
+                      <span>{log.message}</span>
+                    </div>
+                  ))}
                 </div>
-                <a href={modelOfWeek.url} target="_blank" rel="noopener noreferrer" title={modelOfWeek.description} aria-label={`Open ${modelOfWeek.name}`} className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-zinc-300 hover:bg-zinc-800 lg:h-7 lg:w-7"><ExternalLink className="h-4 w-4 lg:h-3.5 lg:w-3.5" /></a>
               </div>
             )}
           </div>
+        )}
 
-          {/* What do you want to do? + capabilities: one tidy row on a big screen, two scrolling rows on a phone */}
-          <div className="mb-3 -mx-3 sm:mx-0 lg:flex lg:flex-wrap lg:items-center lg:gap-x-2 lg:gap-y-2">
-            <div className="flex gap-1.5 overflow-x-auto px-3 sm:px-0 lg:flex-wrap pb-1 lg:pb-0" data-testid="quick-picks" style={{ scrollbarWidth: 'none' }}>
-              <span className="hidden shrink-0 self-center pr-1 text-sm text-zinc-500 lg:block">I want to:</span>
-              {TASKS.map(t => (
-                <button
-                  key={t.id}
-                  onClick={() => patch({ task: filters.task === t.id ? null : t.id })}
-                  aria-pressed={filters.task === t.id}
-                  title={t.hint}
-                  data-testid={`task-${t.id}`}
-                  className={`h-9 shrink-0 whitespace-nowrap rounded-full border px-3.5 text-sm transition-colors ${filters.task === t.id ? 'border-white bg-white text-black' : 'border-zinc-700 text-zinc-300 hover:bg-zinc-900 hover:text-white'}`}
-                >
-                  {t.label}
-                </button>
-              ))}
-            </div>
-            <span className="mx-2 hidden h-6 w-px bg-zinc-800 2xl:block" />
-            <div className="mt-2 flex gap-1.5 overflow-x-auto px-3 sm:px-0 lg:mt-0 lg:flex-wrap pb-1 lg:pb-0" data-testid="capabilities" style={{ scrollbarWidth: 'none' }}>
-              {allCapabilities.map(c => (
-                <Button
-                  key={c}
-                  variant={filters.cap === c ? 'secondary' : 'outline'}
-                  size="sm"
-                  onClick={() => patch({ cap: filters.cap === c ? null : c })}
-                  className={`shrink-0 rounded-full text-xs font-medium gap-1 px-3 py-0.5 h-8 ${filters.cap === c ? 'bg-zinc-700 hover:bg-zinc-600 text-white' : 'bg-transparent border-zinc-700 text-zinc-300 hover:bg-zinc-900 hover:text-white'}`}
-                >
-                  {capabilityIcon(c)}<span className="capitalize">{c}</span>
-                </Button>
-              ))}
+        {/* Search and your computer */}
+        <div className="flex flex-col gap-2 lg:flex-row lg:items-center">
+          <div className="relative w-full lg:max-w-2xl lg:flex-1">
+            <Search className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-zinc-500" />
+            <Input
+              type="search"
+              placeholder="Search 17,000+ models…"
+              aria-label="Search models"
+              value={filters.q}
+              onChange={e => patch({ q: e.target.value })}
+              className="h-12 rounded-lg border-zinc-800 bg-zinc-900 pl-12 pr-24 text-base text-white focus-visible:border-transparent focus-visible:ring-1 focus-visible:ring-white"
+            />
+            <div className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-xs tabular-nums text-zinc-500" data-testid="counter">
+              {results.length.toLocaleString()} of {allModels.length.toLocaleString()}
             </div>
           </div>
+          <div className="lg:ml-auto"><DevicePicker device={device} onChange={changeDevice} fitOnly={filters.fitOnly} onFitOnly={v => patch({ fitOnly: v })} /></div>
+        </div>
 
-          {/* Active choices */}
-          {(filters.cap || filters.task || filters.owner || filters.updatedDays > 0 || filters.maxGB > 0 || filters.minContextK > 0 || filters.dedupe) && (
-            <div className="mb-3 flex flex-wrap items-center gap-1.5 text-xs" data-testid="active-filters">
-              {[
-                filters.task && `Task: ${taskLabel}`,
-                filters.cap && `Capability: ${filters.cap}`,
-                filters.owner && `By ${filters.owner}`,
-                filters.updatedDays > 0 && `Updated in ${filters.updatedDays} days`,
-                filters.maxGB > 0 && `Under ${filters.maxGB} GB`,
-                filters.minContextK > 0 && `${filters.minContextK}K+ context`,
-                filters.dedupe && 'No near-duplicates',
-              ].filter(Boolean).map(label => <span key={String(label)} className="rounded-full bg-zinc-800 px-2.5 py-1 text-zinc-200">{label}</span>)}
-              <button onClick={() => patch({ cap: null, task: null, owner: '', updatedDays: 0, maxGB: 0, minContextK: 0, dedupe: false })} className="inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-zinc-400 hover:text-white"><X className="h-3 w-3" />Clear</button>
-            </div>
-          )}
-
-          {filters.q.trim().length >= 2 && filters.scope !== 'official' && (
-            <div className="text-xs text-zinc-400 mb-3" data-testid="live-search">
-              <span>Can&apos;t find it? The saved list can be a few days old. </span>
-              <button onClick={runLiveSearch} disabled={liveSearching !== null} className="text-blue-400 hover:text-blue-300 underline underline-offset-2 disabled:opacity-60">
-                {liveSearching ? 'Searching…' : `Search ollama.com live for “${filters.q.trim()}”`}
+        {/* Which models: source tabs on the left, view on the right */}
+        <div className="mt-4 flex flex-wrap items-end justify-between gap-x-6 gap-y-2 border-b border-zinc-800">
+          <div className="-mb-px flex max-w-full overflow-x-auto" role="tablist" aria-label="Which models to show">
+            {([['all', 'All', allModels.length], ['official', 'Official', officialCount], ['community', 'Community', allModels.length - officialCount]] as const).map(([value, label, count]) => (
+              <button
+                key={value}
+                role="tab"
+                aria-selected={filters.scope === value}
+                data-testid={`scope-${value}`}
+                onClick={() => patch({ scope: value })}
+                className={`h-11 whitespace-nowrap border-b-2 px-3.5 text-sm font-medium transition-colors ${filters.scope === value ? 'border-white text-white' : 'border-transparent text-zinc-500 hover:text-zinc-200'}`}
+              >
+                {label} <span className="ml-1 text-zinc-500 tabular-nums">{count.toLocaleString()}</span>
               </button>
-              {liveMessage && <div className="mt-1 text-zinc-500">{liveMessage}</div>}
-            </div>
-          )}
-
-          {filters.view === 'trending' && (
-            <p className="mb-3 text-xs text-zinc-500" data-testid="trending-note">
-              {growthKnown
-                ? 'Ranked by downloads gained since the last weekly update.'
-                : 'Ranked by downloads and recent updates. Weekly download growth appears after the next list update.'}
-            </p>
-          )}
-          {filters.view === 'new' && <p className="mb-3 text-xs text-zinc-500">Models added or updated in the last two weeks, newest first.</p>}
-
-          {/* Results */}
-          {allModels.length === 0 && !isPending && !refreshing ? (
-            <div className="text-center py-16 bg-zinc-900 rounded-lg border border-zinc-800 shadow-lg">
-              <div className="inline-block rounded-full bg-zinc-800 p-5 mb-6 border border-zinc-700"><Search className="h-8 w-8 text-zinc-500" /></div>
-              <h3 className="text-2xl font-medium text-white mb-3">No Models Loaded</h3>
-              <p className="text-zinc-400 mb-8">Click the &quot;Refresh Data&quot; button above to load models from Ollama.com</p>
-            </div>
-          ) : results.length === 0 ? (
-            <div className="text-center py-16 bg-zinc-900 rounded-lg border border-zinc-800 shadow-lg" data-testid="no-results">
-              <div className="inline-block rounded-full bg-zinc-800 p-5 mb-6 border border-zinc-700"><Search className="h-8 w-8 text-zinc-500" /></div>
-              <h3 className="text-xl font-medium text-white mb-3">No models match</h3>
-              <p className="text-zinc-400 mb-6 px-4">Try fewer filters{filters.fitOnly ? ', or turn off “Only show what runs on it”' : ''}.</p>
-              <Button onClick={() => setFilters({ ...DEFAULT_FILTERS, view: filters.view === 'trending' ? 'trending' : 'browse' })} variant="outline" className="border-zinc-700 bg-zinc-800 hover:bg-zinc-700 text-white px-4 py-1 h-10 text-sm">Clear everything</Button>
-            </div>
-          ) : isMobile ? (
-            <div className="space-y-2.5" data-testid="card-list">
-              {visible.map(m => (
-                <ModelCard
-                  key={m.name}
-                  model={m}
-                  fit={fitFor(m)}
-                  selected={compare.includes(m.name)}
-                  canSelect={compare.length < MAX_COMPARE}
-                  onToggle={() => toggleCompare(m.name)}
-                  onOwner={owner => patch({ owner, scope: 'community' })}
-                  relativeTime={relativeTime}
-                />
-              ))}
-              {hasMore && <div ref={setSentinel} className="py-4 text-center text-xs text-zinc-500">Showing {visible.length.toLocaleString()} of {results.length.toLocaleString()} · scroll for more</div>}
-            </div>
-          ) : (
-            <div className="overflow-hidden bg-zinc-900 border border-zinc-800 rounded-lg shadow-xl">
-              <div className="overflow-x-auto">
-                <Table>
-                  <TableHeader>
-                    <TableRow className="border-zinc-800 hover:bg-transparent bg-zinc-950">
-                      <TableHead className="w-10 py-2.5"><span className="sr-only">Compare</span></TableHead>
-                      <TableHead className="cursor-pointer py-2.5 text-zinc-300 font-medium hover:text-white transition-colors" onClick={() => handleSort('name')}>
-                        <div className="flex items-center"><span>Model</span> {sortIcon('name')}</div>
-                      </TableHead>
-                      <TableHead className="py-2.5 text-zinc-300 font-medium">Capabilities</TableHead>
-                      <TableHead className="cursor-pointer py-2.5 text-zinc-300 font-medium hover:text-white transition-colors hidden xl:table-cell" onClick={() => handleSort('versions')}>
-                        <div className="flex items-center"><span>Versions</span> {sortIcon('versions')}</div>
-                      </TableHead>
-                      <TableHead className="cursor-pointer py-2.5 text-zinc-300 font-medium hover:text-white transition-colors" onClick={() => handleSort('size')}>
-                        <div className="flex items-center"><Gauge className="mr-2 h-4 w-4 text-zinc-400" /><span>Size</span> {sortIcon('size')}</div>
-                      </TableHead>
-                      <TableHead className="cursor-pointer py-2.5 text-zinc-300 font-medium hover:text-white transition-colors hidden 2xl:table-cell" onClick={() => handleSort('context')}>
-                        <div className="flex items-center"><Brain className="mr-2 h-4 w-4 text-zinc-400" /><span>Context</span> {sortIcon('context')}</div>
-                      </TableHead>
-                      <TableHead className="cursor-pointer py-2.5 text-zinc-300 font-medium hover:text-white transition-colors" onClick={() => handleSort('downloads')}>
-                        <div className="flex items-center"><span>Downloads</span> {sortIcon('downloads')}</div>
-                      </TableHead>
-                      <TableHead className="cursor-pointer py-2.5 text-zinc-300 font-medium hover:text-white transition-colors hidden 2xl:table-cell" onClick={() => handleSort('updated')}>
-                        <div className="flex items-center"><span>Updated</span> {sortIcon('updated')}</div>
-                      </TableHead>
-                      <TableHead className="text-right py-2.5 text-zinc-300 font-medium">Link</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {visible.map(model => {
-                      const owner = ownerOf(model);
-                      const fit = fitFor(model);
-                      const picked = compare.includes(model.name);
-                      return (
-                        <TableRow key={model.name} data-testid="model-row" data-name={model.name} className={`border-zinc-800 hover:bg-zinc-800/50 transition-colors ${picked ? 'bg-blue-500/5' : ''}`}>
-                          <TableCell className="py-2.5 w-10">
-                            <input
-                              type="checkbox"
-                              checked={picked}
-                              disabled={!picked && compare.length >= MAX_COMPARE}
-                              onChange={() => toggleCompare(model.name)}
-                              aria-label={`Compare ${model.name}`}
-                              data-testid="compare-check"
-                              className="h-4 w-4 accent-blue-500 cursor-pointer"
-                            />
-                          </TableCell>
-                          <TableCell className="py-2.5">
-                            <div className="font-medium text-white" data-testid="model-name">
-                              {owner ? (
-                                <><button onClick={() => patch({ owner, scope: 'community' })} title={`Show everything by ${owner}`} className="text-zinc-500 hover:text-zinc-300 font-normal">{owner}/</button>{model.name.slice(owner.length + 1)}</>
-                              ) : model.name}
-                              {isNewModel(model) && daysSince(model.firstSeen) <= 30 && <Badge className="ml-2 bg-blue-500/20 text-blue-300 border-transparent text-[10px] uppercase">New</Badge>}
-                            </div>
-                            <div className="text-sm text-zinc-400 mt-1 max-w-52 lg:max-w-md truncate">{model.description}</div>
-                          </TableCell>
-                          <TableCell className="py-2.5">
-                            <div className="flex flex-wrap gap-1 mt-1">
-                              {model.capabilities.slice(0, 3).map((capability, idx) => (
-                                <Badge key={idx} variant="secondary" className="bg-zinc-800 text-white border-zinc-700 flex items-center gap-1.5 py-1 h-auto">
-                                  {capabilityIcon(capability)}<span className="text-xs capitalize">{capability.toLowerCase()}</span>
-                                </Badge>
-                              ))}
-                              {model.capabilities.length > 3 && <Badge variant="outline" className="text-xs bg-transparent border-zinc-700 text-white">+{model.capabilities.length - 3}</Badge>}
-                            </div>
-                          </TableCell>
-                          <TableCell className="py-2.5 hidden xl:table-cell">
-                            <div className="flex items-center gap-2">
-                              <span className="font-mono text-white bg-zinc-800 px-2.5 py-0.5 rounded-md min-w-[2rem] text-center">{model.versions.length || model.tagsCount || 0}</span>
-                              {model.versions.some(v => v.isLatest) && (
-                                <Badge className="bg-zinc-800 text-white border-zinc-700 flex items-center gap-1"><Clock className="h-3 w-3" /><span className="text-xs">latest</span></Badge>
-                              )}
-                            </div>
-                          </TableCell>
-                          <TableCell className="py-2.5">
-                            <div className="flex flex-col items-start gap-1.5">
-                              <div className="font-mono text-sm text-white bg-zinc-800 px-2.5 py-0.5 rounded-md inline-flex items-center gap-1.5"><Tag className="h-3.5 w-3.5 text-zinc-400" />{sizeSummary(model)}</div>
-                              <FitBadge fit={fit} />
-                            </div>
-                          </TableCell>
-                          <TableCell className="py-2.5 hidden 2xl:table-cell">
-                            <div className="font-mono text-sm text-white bg-zinc-800 px-2.5 py-0.5 rounded-md inline-flex items-center gap-1.5">
-                              <Gauge className="h-3.5 w-3.5 text-zinc-400" />
-                              {(() => { const c = maxContextK(model); return c ? (c >= 1000 ? `${c / 1000}M` : `${c}K`) : 'N/A'; })()}
-                            </div>
-                          </TableCell>
-                          <TableCell className="py-2.5 text-sm text-zinc-300 tabular-nums" data-testid="downloads">
-                            {model.pulls || '—'}
-                            {filters.view === 'trending' && growthKnown && model.growth ? <div className="text-xs text-emerald-400">+{model.growth.toLocaleString()}</div> : null}
-                          </TableCell>
-                          <TableCell className="py-2.5 hidden 2xl:table-cell text-sm text-zinc-400 whitespace-nowrap">{model.updated ? relativeTime(model.updated) : '—'}</TableCell>
-                          <TableCell className="py-2.5 text-right">
-                            <Button variant="outline" size="icon" asChild className="h-9 w-9 rounded-full bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 text-white hover:text-white">
-                              <a href={model.url} target="_blank" rel="noopener noreferrer" aria-label={`Visit ${model.name}`}><ExternalLink className="h-4 w-4" /></a>
-                            </Button>
-                          </TableCell>
-                        </TableRow>
-                      );
-                    })}
-                  </TableBody>
-                </Table>
-              </div>
-              {hasMore && <div ref={setSentinel} className="py-4 text-center text-xs text-zinc-500 border-t border-zinc-800">Showing {visible.length.toLocaleString()} of {results.length.toLocaleString()} · scroll for more</div>}
-            </div>
-          )}
-
-          {/* Footer */}
-          <div className="mt-10 text-center text-sm text-zinc-600 space-y-2">
-            <p>
-              {allModels.length.toLocaleString()} models • {officialCount.toLocaleString()} official, {(allModels.length - officialCount).toLocaleString()} community
-              {catalogueDate ? ` • list saved ${new Date(catalogueDate).toLocaleDateString()}` : ''}
-            </p>
-            <p className="flex flex-wrap items-center justify-center gap-x-4 gap-y-1 text-xs">
-              <a href="/api/v1/models?limit=20" className="inline-flex items-center gap-1 hover:text-zinc-300"><Braces className="h-3 w-3" />JSON API</a>
-              <a href="/feed.xml" className="inline-flex items-center gap-1 hover:text-zinc-300"><Rss className="h-3 w-3" />New models feed</a>
-              <a href="https://github.com/p32929/ollama_models_explorer" target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 hover:text-zinc-300"><Github className="h-3 w-3" />Source</a>
-            </p>
-            {lastUpdated && <p className="text-xs">Official models re-read: {new Date(lastUpdated).toLocaleString()}</p>}
+            ))}
+          </div>
+          <div className="mb-1.5 inline-flex max-w-full overflow-x-auto rounded-lg bg-zinc-900 p-0.5" role="tablist" aria-label="View">
+            {VIEWS.map(v => (
+              <button
+                key={v.id}
+                role="tab"
+                aria-selected={filters.view === v.id}
+                data-testid={`view-${v.id}`}
+                onClick={() => patch({ view: v.id })}
+                className={`inline-flex h-9 items-center gap-1.5 whitespace-nowrap rounded-md px-3.5 text-sm font-medium transition-colors ${filters.view === v.id ? 'bg-zinc-700 text-white' : 'text-zinc-400 hover:text-white'}`}
+              >
+                {v.icon}{v.label}
+              </button>
+            ))}
           </div>
         </div>
+
+        {/* Filter bar */}
+        <div className="-mx-3 mt-3 flex items-center gap-2 overflow-x-auto px-3 pb-1 sm:-mx-4 sm:px-4 lg:mx-0 lg:overflow-visible lg:px-0 lg:pb-0" data-testid="filter-bar" style={{ scrollbarWidth: 'none' }}>
+          <Dropdown id="tasks" label="I want to" icon={<Sparkles className="h-4 w-4 text-zinc-400" />} multi options={taskOptions} selected={filters.tasks} onChange={tasks => patch({ tasks })} help="Pick one or more: models must match all of them" />
+          <Dropdown id="caps" label="Capabilities" icon={<Brain className="h-4 w-4 text-zinc-400" />} multi options={capabilityOptions} selected={filters.caps} onChange={caps => patch({ caps })} help="Models must have all the ones you tick" />
+          <button
+            onClick={() => setShowFilters(true)}
+            data-testid="open-filters"
+            className={`inline-flex h-10 shrink-0 items-center gap-2 rounded-md border px-3 text-sm transition-colors lg:h-9 ${filterCount ? 'border-zinc-500 bg-zinc-800 text-white' : 'border-zinc-700 text-zinc-300 hover:bg-zinc-900 hover:text-white'}`}
+          >
+            <SlidersHorizontal className="h-4 w-4 text-zinc-400" /> More filters{filterCount > 0 && <span className="rounded-full bg-white px-1.5 text-xs font-semibold text-black">{filterCount}</span>}
+          </button>
+          <label className="ml-auto inline-flex shrink-0 items-center gap-2 text-sm text-zinc-500">
+            <span className="hidden sm:inline">Sort by</span>
+            <select
+              value={filters.sort}
+              onChange={e => patch({ sort: e.target.value as SortField, dir: ['name', 'size', 'versions'].includes(e.target.value) ? 'asc' : 'desc' })}
+              aria-label="Sort by"
+              data-testid="sort-select"
+              className="h-10 rounded-md border border-zinc-700 bg-zinc-900 px-3 text-sm text-zinc-200 lg:h-9"
+            >
+              {SORT_OPTIONS.map(o => <option key={o.id} value={o.id}>{o.label}</option>)}
+            </select>
+          </label>
+        </div>
+
+        {chips.length > 0 && (
+          <div className="mt-3 flex flex-wrap items-center gap-1.5 text-xs" data-testid="active-filters">
+            {chips.map(c => (
+              <button key={c.key} onClick={c.remove} aria-label={`Remove filter ${c.label}`} className="inline-flex h-8 items-center gap-1.5 rounded-full bg-zinc-800 pl-3 pr-2 text-zinc-100 hover:bg-zinc-700">
+                {c.label}<X className="h-3.5 w-3.5 text-zinc-400" />
+              </button>
+            ))}
+            <button onClick={() => patch({ caps: [], tasks: [], owner: '', updatedDays: 0, maxGB: 0, minContextK: 0, dedupe: false })} className="inline-flex h-8 items-center rounded-full px-2.5 text-zinc-400 hover:text-white">Clear all</button>
+          </div>
+        )}
+
+        {filters.q.trim().length >= 2 && filters.scope !== 'official' && (
+          <div className="mt-3 text-xs text-zinc-400" data-testid="live-search">
+            <span>Can&apos;t find it? The saved list can be a few days old. </span>
+            <button onClick={runLiveSearch} disabled={liveSearching !== null} className="text-blue-400 hover:text-blue-300 underline underline-offset-2 disabled:opacity-60">
+              {liveSearching ? 'Searching…' : `Search ollama.com live for “${filters.q.trim()}”`}
+            </button>
+            {liveMessage && <div className="mt-1 text-zinc-500">{liveMessage}</div>}
+          </div>
+        )}
+        {filters.view === 'trending' && (
+          <p className="mt-3 text-xs text-zinc-500" data-testid="trending-note">
+            {growthKnown ? 'Ranked by downloads gained since the last weekly update.' : 'Ranked by downloads and recent updates. Weekly download growth appears after the next list update.'}
+          </p>
+        )}
+        {filters.view === 'new' && <p className="mt-3 text-xs text-zinc-500">Models added or updated in the last two weeks, newest first.</p>}
+
+        {/* Results */}
+        <div className="mt-4">
+        {allModels.length === 0 && !isPending && !refreshing ? (
+          <div className="text-center py-16 bg-zinc-900 rounded-lg border border-zinc-800">
+            <div className="inline-block rounded-full bg-zinc-800 p-5 mb-6 border border-zinc-700"><Search className="h-8 w-8 text-zinc-500" /></div>
+            <h3 className="text-2xl font-medium text-white mb-3">No Models Loaded</h3>
+            <p className="text-zinc-400 mb-8">Click the &quot;Refresh&quot; button above to load models from Ollama.com</p>
+          </div>
+        ) : results.length === 0 ? (
+          <div className="text-center py-16 bg-zinc-900 rounded-lg border border-zinc-800" data-testid="no-results">
+            <div className="inline-block rounded-full bg-zinc-800 p-5 mb-6 border border-zinc-700"><Search className="h-8 w-8 text-zinc-500" /></div>
+            <h3 className="text-xl font-medium text-white mb-3">No models match</h3>
+            <p className="text-zinc-400 mb-6 px-4">Try fewer filters{filters.fitOnly ? ', or turn off “Only show what runs on it”' : ''}.</p>
+            <Button onClick={() => setFilters({ ...DEFAULT_FILTERS, view: filters.view === 'trending' ? 'trending' : 'browse' })} variant="outline" className="border-zinc-700 bg-zinc-800 hover:bg-zinc-700 text-white px-4 py-1 h-10 text-sm">Clear everything</Button>
+          </div>
+        ) : isMobile ? (
+          <div className="space-y-2.5" data-testid="card-list">
+            {visible.map(m => (
+              <ModelCard
+                key={m.name}
+                model={m}
+                fit={fitFor(m)}
+                selected={compare.includes(m.name)}
+                canSelect={compare.length < MAX_COMPARE}
+                onToggle={() => toggleCompare(m.name)}
+                onOwner={owner => patch({ owner, scope: 'community' })}
+                relativeTime={relativeTime}
+              />
+            ))}
+            {hasMore && <div ref={setSentinel} className="py-4 text-center text-xs text-zinc-500">Showing {visible.length.toLocaleString()} of {results.length.toLocaleString()} · scroll for more</div>}
+          </div>
+        ) : (
+          <div className="overflow-hidden rounded-xl border border-zinc-800 bg-zinc-950">
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow className="border-zinc-800 bg-zinc-950 hover:bg-transparent">
+                    <TableHead className="w-12 pl-4"><span className="sr-only">Compare</span></TableHead>
+                    <TableHead className={sortable} onClick={() => handleSort('name')}><div className="flex items-center">Model {sortIcon('name')}</div></TableHead>
+                    <TableHead className={th}>On {device?.manual ? 'your' : 'this'} computer</TableHead>
+                    <TableHead className={sortable} onClick={() => handleSort('size')}><div className="flex items-center">Size {sortIcon('size')}</div></TableHead>
+                    <TableHead className={`${th} hidden lg:table-cell`}>Capabilities</TableHead>
+                    <TableHead className={sortable} onClick={() => handleSort('downloads')}><div className="flex items-center">Downloads {sortIcon('downloads')}</div></TableHead>
+                    <TableHead className={`${sortable} hidden xl:table-cell`} onClick={() => handleSort('updated')}><div className="flex items-center">Updated {sortIcon('updated')}</div></TableHead>
+                    <TableHead className={`${sortable} hidden 2xl:table-cell`} onClick={() => handleSort('context')}><div className="flex items-center">Context {sortIcon('context')}</div></TableHead>
+                    <TableHead className="w-14 pr-4"><span className="sr-only">Open</span></TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {visible.map(model => {
+                    const owner = ownerOf(model);
+                    const fit = fitFor(model);
+                    const picked = compare.includes(model.name);
+                    const ctx = maxContextK(model);
+                    return (
+                      <TableRow key={model.name} data-testid="model-row" data-name={model.name} className={`border-zinc-900 transition-colors hover:bg-zinc-900/60 ${picked ? 'bg-blue-500/5' : ''}`}>
+                        <TableCell className="w-12 py-3 pl-4">
+                          <input
+                            type="checkbox"
+                            checked={picked}
+                            disabled={!picked && compare.length >= MAX_COMPARE}
+                            onChange={() => toggleCompare(model.name)}
+                            aria-label={`Compare ${model.name}`}
+                            data-testid="compare-check"
+                            className="h-4 w-4 cursor-pointer accent-blue-500"
+                          />
+                        </TableCell>
+                        <TableCell className="py-3">
+                          <div className="text-[15px] font-medium text-white" data-testid="model-name">
+                            {owner ? (
+                              <><button onClick={() => patch({ owner, scope: 'community' })} title={`Show everything by ${owner}`} className="font-normal text-zinc-500 hover:text-zinc-300">{owner}/</button>{model.name.slice(owner.length + 1)}</>
+                            ) : model.name}
+                            {isNewModel(model) && daysSince(model.firstSeen) <= 30 && <Badge className="ml-2 border-transparent bg-blue-500/20 text-[10px] uppercase text-blue-300">New</Badge>}
+                          </div>
+                          <div className="mt-0.5 max-w-xl truncate text-sm text-zinc-500">{model.description}</div>
+                        </TableCell>
+                        <TableCell className="py-3"><FitBadge fit={fit} /></TableCell>
+                        <TableCell className="py-3">
+                          <div className="font-mono text-sm text-zinc-100 whitespace-nowrap">{sizeSummary(model)}</div>
+                          {(model.versions.length || model.tagsCount) ? <div className="text-xs text-zinc-500">{model.versions.length || model.tagsCount} versions</div> : null}
+                        </TableCell>
+                        <TableCell className="hidden py-3 lg:table-cell">
+                          <div className="flex flex-wrap gap-1">
+                            {model.capabilities.slice(0, 3).map(c => (
+                              <span key={c} className="inline-flex items-center gap-1 rounded-md bg-zinc-800/70 px-2 py-0.5 text-xs capitalize text-zinc-300">{capabilityIcon(c)}{c.toLowerCase()}</span>
+                            ))}
+                            {model.capabilities.length > 3 && <span className="px-1 text-xs text-zinc-500">+{model.capabilities.length - 3}</span>}
+                          </div>
+                        </TableCell>
+                        <TableCell className="py-3 text-sm tabular-nums text-zinc-200" data-testid="downloads">
+                          {model.pulls || '—'}
+                          {filters.view === 'trending' && growthKnown && model.growth ? <div className="text-xs text-emerald-400">+{model.growth.toLocaleString()}</div> : null}
+                        </TableCell>
+                        <TableCell className="hidden whitespace-nowrap py-3 text-sm text-zinc-400 xl:table-cell">{model.updated ? relativeTime(model.updated) : '—'}</TableCell>
+                        <TableCell className="hidden py-3 font-mono text-sm text-zinc-300 2xl:table-cell">{ctx ? (ctx >= 1000 ? `${ctx / 1000}M` : `${ctx}K`) : <span className="text-zinc-600">—</span>}</TableCell>
+                        <TableCell className="w-14 py-3 pr-4 text-right">
+                          <a href={model.url} target="_blank" rel="noopener noreferrer" aria-label={`Visit ${model.name}`} className="inline-flex h-9 w-9 items-center justify-center rounded-md text-zinc-400 hover:bg-zinc-800 hover:text-white"><ExternalLink className="h-4 w-4" /></a>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
+                </TableBody>
+              </Table>
+            </div>
+            {hasMore && <div ref={setSentinel} className="border-t border-zinc-800 py-4 text-center text-xs text-zinc-500">Showing {visible.length.toLocaleString()} of {results.length.toLocaleString()} · scroll for more</div>}
+          </div>
+        )}
+        </div>
+
+        {/* Footer */}
+        <footer className="mt-10 space-y-2 text-center text-sm text-zinc-600">
+          <p>
+            {allModels.length.toLocaleString()} models • {officialCount.toLocaleString()} official, {(allModels.length - officialCount).toLocaleString()} community
+            {catalogueDate ? ` • list saved ${new Date(catalogueDate).toLocaleDateString()}` : ''}
+          </p>
+          <p className="flex flex-wrap items-center justify-center gap-x-4 gap-y-1 text-xs">
+            <a href="/api/v1/models?limit=20" className="inline-flex items-center gap-1 hover:text-zinc-300"><Braces className="h-3 w-3" />JSON API</a>
+            <a href="/feed.xml" className="inline-flex items-center gap-1 hover:text-zinc-300"><Rss className="h-3 w-3" />New models feed</a>
+            <a href="https://github.com/p32929/ollama_models_explorer" target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 hover:text-zinc-300"><Github className="h-3 w-3" />Source</a>
+          </p>
+          {lastUpdated && <p className="text-xs">Official models re-read: {new Date(lastUpdated).toLocaleString()}</p>}
+        </footer>
       </div>
 
       {/* Compare bar */}
       {compare.length > 0 && (
-        <div className="fixed inset-x-0 bottom-0 z-30 border-t border-zinc-800 bg-zinc-950/95 backdrop-blur px-3 pt-2 pb-[max(0.5rem,env(safe-area-inset-bottom))]" data-testid="compare-bar">
+        <div className="fixed inset-x-0 bottom-0 z-30 border-t border-zinc-800 bg-zinc-950/95 px-3 pt-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] backdrop-blur" data-testid="compare-bar">
           <div className="mx-auto flex max-w-3xl items-center gap-2">
             <GitCompare className="hidden h-4 w-4 text-zinc-400 sm:block" />
             <div className="min-w-0 flex-1 truncate text-sm text-zinc-300">

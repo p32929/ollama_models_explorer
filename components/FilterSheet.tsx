@@ -82,7 +82,7 @@ export function FilterSheet({ filters, onChange, onClose, resultCount, hiddenDup
         </div>
         <div className="flex gap-2 border-t border-zinc-800 p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
           <button
-            onClick={() => onChange({ updatedDays: 0, maxGB: 0, minContextK: 0, dedupe: false, owner: '', cap: null, task: null, fitOnly: false })}
+            onClick={() => onChange({ updatedDays: 0, maxGB: 0, minContextK: 0, dedupe: false, owner: '', caps: [], tasks: [], fitOnly: false })}
             className="h-11 flex-1 rounded-lg border border-zinc-700 text-sm text-zinc-200 hover:bg-zinc-900"
             disabled={active === 0}
           >

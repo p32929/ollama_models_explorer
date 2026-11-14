@@ -13,7 +13,7 @@ A modern, dark-themed UI for exploring and filtering Ollama AI models. This Next
 
 <p align="center">
   <img src="docs/screenshots/phone.png" height="460" alt="On a phone: models are cards">
-  <img src="docs/screenshots/phone-computer.png" height="460" alt="Picking your computer with one tap">
+  <img src="docs/screenshots/phone-picks.png" height="460" alt="Picking what you want to do, several at once">
 </p>
 
 ## Features
@@ -23,7 +23,8 @@ A modern, dark-themed UI for exploring and filtering Ollama AI models. This Next
 **Will it run on my computer?** The page finds your graphics card (or Apple chip) and memory by itself, with nothing to type, and marks every model **Runs well / Tight fit / Too big / Cloud**. If the guess is wrong, one tap picks the closest computer. "Only show what runs on it" hides the rest. (Browsers hide exact specs, so it is an estimate: official models use their real download sizes, the rest are estimated from the parameter count.)
 
 **Find the right one**
-- **Quick picks**: Coding, Small & fast, Images, Reasoning, Embeddings, Translation, Chat & roleplay, Math, Tool use
+- **I want to…** (pick several, a model must match all): Coding, Small & fast, Images, Reasoning, Embeddings, Translation, Chat & roleplay, Math, Tool use
+- **Capabilities** (also several): Tools, Vision, Thinking, Embedding, Audio, Cloud…
 - **Search** by any words in the name, description or capabilities; **Search ollama.com live** for anything newer than the saved list
 - **Filters**: updated recently, size, context window, publisher (click a name), hide near-duplicates, capabilities
 - **Sort** by downloads, last update, name, size, context window or versions

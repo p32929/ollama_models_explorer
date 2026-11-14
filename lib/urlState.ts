@@ -4,6 +4,7 @@ import { DEFAULT_FILTERS, type Filters, type Scope, type SortField, type View } 
 const SCOPES: Scope[] = ['all', 'official', 'community'];
 const VIEWS: View[] = ['browse', 'new', 'trending'];
 const SORTS: SortField[] = ['auto', 'name', 'versions', 'size', 'context', 'downloads', 'updated'];
+const list = (v: string | null) => (v || '').split(',').map(s => s.trim().toLowerCase()).filter(Boolean);
 const num = (v: string | null) => { const n = Number(v); return Number.isFinite(n) && n > 0 ? n : 0; };
 
 export function filtersToQuery(f: Filters, compare: string[] = []): string {
@@ -11,8 +12,8 @@ export function filtersToQuery(f: Filters, compare: string[] = []): string {
   if (f.q.trim()) p.set('q', f.q.trim());
   if (f.scope !== 'all') p.set('scope', f.scope);
   if (f.view !== 'browse') p.set('view', f.view);
-  if (f.cap) p.set('cap', f.cap);
-  if (f.task) p.set('task', f.task);
+  if (f.caps.length) p.set('cap', f.caps.join(','));
+  if (f.tasks.length) p.set('task', f.tasks.join(','));
   if (f.sort !== 'auto') { p.set('sort', f.sort); p.set('dir', f.dir); }
   if (f.updatedDays) p.set('updated', String(f.updatedDays));
   if (f.maxGB) p.set('max', String(f.maxGB));
@@ -33,8 +34,8 @@ export function queryToFilters(search: string): { filters: Filters; compare: str
     q: p.get('q') || '',
     scope: pick(p.get('scope'), SCOPES, 'all'),
     view: pick(p.get('view'), VIEWS, 'browse'),
-    cap: p.get('cap') || null,
-    task: p.get('task') || null,
+    caps: list(p.get('cap')),
+    tasks: list(p.get('task')),
     sort: pick(p.get('sort'), SORTS, 'auto'),
     dir: p.get('dir') === 'asc' ? 'asc' : 'desc',
     updatedDays: num(p.get('updated')),

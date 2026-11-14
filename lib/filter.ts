@@ -12,8 +12,10 @@ export interface Filters {
   q: string;
   scope: Scope;
   view: View;
-  cap: string | null;
-  task: string | null;
+  /** Capabilities the model must have, all of them (e.g. tools AND vision) */
+  caps: string[];
+  /** Quick picks the model must match, all of them (e.g. coding AND small) */
+  tasks: string[];
   sort: SortField;
   dir: SortDirection;
   /** Only models updated in the last N days (0 = any) */
@@ -31,7 +33,7 @@ export interface Filters {
 }
 
 export const DEFAULT_FILTERS: Filters = {
-  q: '', scope: 'all', view: 'browse', cap: null, task: null, sort: 'auto', dir: 'desc',
+  q: '', scope: 'all', view: 'browse', caps: [], tasks: [], sort: 'auto', dir: 'desc',
   updatedDays: 0, maxGB: 0, minContextK: 0, owner: '', dedupe: false, fitOnly: false,
 };
 
@@ -42,7 +44,7 @@ const minSizeGB = (m: ModelData) => { const v = variantsOf(m); return v.length ?
 
 /** Which filters are active (not counting the search box, scope and view, which have their own controls) */
 export function activeFilterCount(f: Filters): number {
-  return [f.cap, f.task, f.updatedDays, f.maxGB, f.minContextK, f.owner, f.dedupe, f.fitOnly].filter(Boolean).length;
+  return [f.caps.length, f.tasks.length, f.updatedDays, f.maxGB, f.minContextK, f.owner, f.dedupe, f.fitOnly].filter(Boolean).length;
 }
 
 export const isNewModel = (m: ModelData, now = Date.now()) => daysSince(m.firstSeen, now) <= 30 || daysSince(m.updated, now) <= 14;
@@ -62,7 +64,7 @@ export interface Result {
 
 export function applyFilters(all: ModelData[], f: Filters, memoryGB: number, now = Date.now(), liveNames?: Set<string>): Result {
   const words = f.q.toLowerCase().split(/\s+/).filter(Boolean);
-  const task = f.task ? TASK_BY_ID[f.task] : undefined;
+  const tasks = f.tasks.map(id => TASK_BY_ID[id]).filter(Boolean);
   const owner = f.owner.toLowerCase();
 
   let list = all.filter(m => {
@@ -70,8 +72,8 @@ export function applyFilters(all: ModelData[], f: Filters, memoryGB: number, now
     if (f.scope === 'official' && community) return false;
     if (f.scope === 'community' && !community) return false;
     if (owner && ownerOf(m).toLowerCase() !== owner) return false;
-    if (f.cap && !m.capabilities.some(c => c.toLowerCase() === f.cap)) return false;
-    if (task && !task.match(m)) return false;
+    if (f.caps.length && !f.caps.every(c => m.capabilities.some(x => x.toLowerCase() === c))) return false;
+    if (tasks.length && !tasks.every(t => t.match(m))) return false;
     if (f.updatedDays && !(daysSince(m.updated, now) <= f.updatedDays)) return false;
     if (f.view === 'new' && !isNewModel(m, now)) return false;
     if (f.maxGB) { const s = minSizeGB(m); if (!s || s > f.maxGB) return false; }

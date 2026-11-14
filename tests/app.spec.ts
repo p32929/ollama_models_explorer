@@ -5,6 +5,14 @@ const rowNames = (page: Page) => page.locator('[data-testid=model-row]').evaluat
 const row = (page: Page, name: string) => page.locator(`[data-testid=model-row][data-name="${name}"]`);
 const counter = (page: Page) => page.getByTestId('counter');
 
+/** Open a drop-down ("tasks" or "caps"), tick or untick one choice, and close it again. */
+async function choose(page: Page, group: 'tasks' | 'caps', value: string) {
+  const panel = page.getByTestId(`${group}-panel`);
+  if (!(await panel.isVisible())) await page.getByTestId(`open-${group}`).click();
+  await page.getByTestId(`${group}-${value}`).click();
+  if (await panel.isVisible()) await page.keyboard.press('Escape');
+}
+
 test.use({ viewport: { width: 1360, height: 900 } });
 
 test.beforeEach(async ({ page }) => {
@@ -84,19 +92,58 @@ test('the search box finds words anywhere in name, description or capability', a
 
 test('quick picks answer "what do I want to do?"', async ({ page }) => {
   await page.goto('/');
-  await page.getByTestId('task-coding').click();
+  await choose(page, 'tasks', 'coding');
   expect(new Set(await rowNames(page))).toEqual(new Set(['qwen2.5-coder', 'bob/coder-uncensored', 'eve/coder-copy']));
-  await page.getByTestId('task-coding').click();
-  await page.getByTestId('task-vision').click();
+  await choose(page, 'tasks', 'coding');
+  await choose(page, 'tasks', 'vision');
   expect(await rowNames(page)).toEqual(['llava']);
-  await page.getByTestId('task-vision').click();
-  await page.getByTestId('task-small').click();
+  await choose(page, 'tasks', 'vision');
+  await choose(page, 'tasks', 'small');
   const small = await rowNames(page);
   expect(small).toContain('tinyllama');
   expect(small).not.toContain('bob/huge-70b');
-  await page.getByTestId('task-small').click();
-  await page.getByTestId('task-translation').click();
+  await choose(page, 'tasks', 'small');
+  await choose(page, 'tasks', 'translation');
   expect(await rowNames(page)).toEqual(['carol/translator']);
+});
+
+test('quick picks can be combined: a model must match all of them', async ({ page }) => {
+  await page.goto('/');
+  await page.getByTestId('open-tasks').click();
+  await page.getByTestId('tasks-coding').click();
+  await page.getByTestId('tasks-small').click();
+  await expect(page.getByTestId('tasks-count')).toHaveText('2');
+  // coding AND small: only qwen2.5-coder has a version of 4b or less; the 7b community coders are not small
+  expect(await rowNames(page)).toEqual(['qwen2.5-coder']);
+  await page.getByTestId('tasks-translation').click(); // coding AND small AND translation: nothing is all three
+  await expect(page.getByTestId('no-results')).toBeVisible();
+  await page.getByTestId('tasks-translation').click();
+  await page.keyboard.press('Escape');
+  await expect(page).toHaveURL(/task=coding%2Csmall/);
+  // chips show each choice, and each can be removed on its own
+  await page.getByRole('button', { name: 'Remove filter Coding' }).click();
+  await expect(page).toHaveURL(/task=small(&|$)/);
+  await expect(page.getByTestId('active-filters')).not.toContainText('Coding');
+});
+
+test('capabilities can be combined too', async ({ page }) => {
+  await page.goto('/');
+  await page.getByTestId('open-caps').click();
+  await page.getByTestId('caps-tools').click();
+  await page.getByTestId('caps-thinking').click();
+  expect(await rowNames(page)).toEqual(['deepseek-r1']); // tools AND thinking
+  await page.getByTestId('caps-thinking').click();
+  expect((await rowNames(page)).length).toBeGreaterThan(1);
+  await page.getByRole('button', { name: 'Clear selection' }).click();
+  await expect(page.getByTestId('caps-count')).toBeHidden();
+});
+
+test('a shared link with several picks opens with them applied', async ({ page }) => {
+  await page.goto('/?task=coding,small&cap=tools');
+  await expect(page.getByTestId('active-filters')).toContainText('Coding');
+  await expect(page.getByTestId('active-filters')).toContainText('Small & fast');
+  await expect(page.getByTestId('active-filters')).toContainText('Tools');
+  expect(await rowNames(page)).toEqual(['qwen2.5-coder']);
 });
 
 test('settings live in the address, so a view can be shared', async ({ page }) => {
@@ -212,7 +259,7 @@ test.describe('filters', () => {
     await expect(page.getByTestId('active-filters')).toContainText('No near-duplicates');
     await expect(page).toHaveURL(/dedupe=1/);
 
-    await page.getByTestId('active-filters').getByRole('button', { name: 'Clear' }).click();
+    await page.getByTestId('active-filters').getByRole('button', { name: 'Clear all' }).click();
     await expect(counter(page)).toHaveText('12 of 12');
   });
 
@@ -226,7 +273,7 @@ test.describe('filters', () => {
 
   test('capability chips and a message when nothing matches', async ({ page }) => {
     await page.goto('/');
-    await page.getByTestId('capabilities').getByRole('button', { name: 'Vision' }).click();
+    await choose(page, 'caps', 'vision');
     expect(await rowNames(page)).toEqual(['llava']);
     await page.getByLabel('Search models').fill('zzzz nothing');
     await expect(page.getByTestId('no-results')).toBeVisible();
@@ -270,7 +317,7 @@ test('the page has no console errors', async ({ page }) => {
   page.on('pageerror', e => errors.push(String(e)));
   await page.goto('/');
   await row(page, 'llama3.1').getByTestId('compare-check').check();
-  await page.getByTestId('task-coding').click();
+  await choose(page, 'tasks', 'coding');
   await page.getByTestId('view-new').click();
   await page.getByTestId('view-trending').click();
   await page.getByTestId('open-filters').click();
