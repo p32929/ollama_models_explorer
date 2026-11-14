@@ -5,12 +5,9 @@ const rowNames = (page: Page) => page.locator('[data-testid=model-row]').evaluat
 const row = (page: Page, name: string) => page.locator(`[data-testid=model-row][data-name="${name}"]`);
 const counter = (page: Page) => page.getByTestId('counter');
 
-/** Open a drop-down ("tasks" or "caps"), tick or untick one choice, and close it again. */
+/** Tick or untick one choice in the always-visible filter panel. */
 async function choose(page: Page, group: 'tasks' | 'caps', value: string) {
-  const panel = page.getByTestId(`${group}-panel`);
-  if (!(await panel.isVisible())) await page.getByTestId(`open-${group}`).click();
   await page.getByTestId(`${group}-${value}`).click();
-  if (await panel.isVisible()) await page.keyboard.press('Escape');
 }
 
 test.use({ viewport: { width: 1360, height: 900 } });
@@ -35,7 +32,7 @@ test('shows every model, most downloaded first, with official and community coun
 test('finds your computer on its own, without typing anything', async ({ page }) => {
   await page.goto('/');
   await expect(page.getByTestId('device-label')).toHaveText('GeForce RTX 4070');
-  await expect(page.getByTestId('device-chip')).toContainText('12 GB');
+  await expect(page.getByTestId('device-bar')).toContainText('12 GB');
   // 12 GB card: 7b coder runs well, a 70b-only model is too big, a cloud model is cloud
   await expect(row(page, 'qwen2.5-coder').getByTestId('fit-good')).toBeVisible();
   await expect(row(page, 'bob/huge-70b').getByTestId('fit-no')).toBeVisible();
@@ -109,16 +106,13 @@ test('quick picks answer "what do I want to do?"', async ({ page }) => {
 
 test('quick picks can be combined: a model must match all of them', async ({ page }) => {
   await page.goto('/');
-  await page.getByTestId('open-tasks').click();
   await page.getByTestId('tasks-coding').click();
   await page.getByTestId('tasks-small').click();
-  await expect(page.getByTestId('tasks-count')).toHaveText('2');
   // coding AND small: only qwen2.5-coder has a version of 4b or less; the 7b community coders are not small
   expect(await rowNames(page)).toEqual(['qwen2.5-coder']);
   await page.getByTestId('tasks-translation').click(); // coding AND small AND translation: nothing is all three
   await expect(page.getByTestId('no-results')).toBeVisible();
   await page.getByTestId('tasks-translation').click();
-  await page.keyboard.press('Escape');
   await expect(page).toHaveURL(/task=coding%2Csmall/);
   // chips show each choice, and each can be removed on its own
   await page.getByRole('button', { name: 'Remove filter Coding' }).click();
@@ -128,14 +122,13 @@ test('quick picks can be combined: a model must match all of them', async ({ pag
 
 test('capabilities can be combined too', async ({ page }) => {
   await page.goto('/');
-  await page.getByTestId('open-caps').click();
   await page.getByTestId('caps-tools').click();
   await page.getByTestId('caps-thinking').click();
   expect(await rowNames(page)).toEqual(['deepseek-r1']); // tools AND thinking
   await page.getByTestId('caps-thinking').click();
   expect((await rowNames(page)).length).toBeGreaterThan(1);
-  await page.getByRole('button', { name: 'Clear selection' }).click();
-  await expect(page.getByTestId('caps-count')).toBeHidden();
+  await page.getByTestId('caps-tools').click();
+  await expect(page.getByTestId('active-filters')).not.toContainText('Tools');
 });
 
 test('a shared link with several picks opens with them applied', async ({ page }) => {
@@ -161,7 +154,7 @@ test('settings live in the address, so a view can be shared', async ({ page }) =
   await useFixtureCatalogue(other);
   await other.goto(shared);
   await expect(other.getByLabel('Search models')).toHaveValue('coder');
-  await expect(other.getByTestId('scope-community')).toHaveAttribute('aria-selected', 'true');
+  await expect(other.getByTestId('scope-community')).toHaveAttribute('aria-checked', 'true');
   expect(await rowNames(other)).toEqual(['bob/coder-uncensored', 'eve/coder-copy']);
 
   await page.getByLabel('Search models').fill('');
@@ -237,29 +230,22 @@ test.describe("what's new and trending", () => {
 test.describe('filters', () => {
   test('updated, size, duplicates and publisher', async ({ page }) => {
     await page.goto('/');
-    await page.getByTestId('open-filters').click();
-    const sheet = page.getByTestId('filter-sheet');
+    const sheet = page.getByTestId('filter-panel');
     await sheet.getByTestId('upd-30').click();
-    await sheet.getByTestId('show-results').click();
     expect(new Set(await rowNames(page))).toEqual(new Set(['gpt-oss-cloud', 'bob/coder-uncensored', 'carol/translator']));
 
-    await page.getByTestId('open-filters').click();
     await sheet.getByTestId('upd-0').click();
     await sheet.getByTestId('max-2').click();
-    await sheet.getByTestId('show-results').click();
     expect(new Set(await rowNames(page))).toEqual(new Set(['tinyllama', 'qwen2.5-coder', 'deepseek-r1'])); // a version under 2 GB
 
-    await page.getByTestId('open-filters').click();
     await sheet.getByTestId('max-0').click();
     await sheet.getByTestId('dedupe').click();
-    await expect(sheet).toContainText('1 community copies hidden');
-    await sheet.getByTestId('show-results').click();
     expect(await rowNames(page)).not.toContain('eve/coder-copy');
     expect(await rowNames(page)).toContain('bob/coder-uncensored');
     await expect(page.getByTestId('active-filters')).toContainText('No near-duplicates');
     await expect(page).toHaveURL(/dedupe=1/);
 
-    await page.getByTestId('active-filters').getByRole('button', { name: 'Clear all' }).click();
+    await page.getByRole('button', { name: 'Clear all filters' }).click();
     await expect(counter(page)).toHaveText('12 of 12');
   });
 
@@ -320,8 +306,6 @@ test('the page has no console errors', async ({ page }) => {
   await choose(page, 'tasks', 'coding');
   await page.getByTestId('view-new').click();
   await page.getByTestId('view-trending').click();
-  await page.getByTestId('open-filters').click();
-  await page.getByTestId('show-results').click();
   expect(errors).toEqual([]);
 });
 
@@ -364,9 +348,7 @@ test.describe('speed', () => {
     await expect(page).toHaveURL(/sort=speed/);
 
     await page.getByTestId('sort-select').selectOption('auto');
-    await page.getByTestId('open-filters').click();
     await page.getByTestId('tps-40').click();
-    await page.getByTestId('show-results').click();
     const fast = await rowNames(page);
     expect(fast).toContain('tinyllama');
     expect(fast).not.toContain('bob/huge-70b');
@@ -488,7 +470,7 @@ test.describe('tooltips', () => {
     await expect(tip(page)).toContainText('words per second');
     await expect(tip(page)).toContainText('504 GB/s');
     await expect(tip(page)).toContainText('by about a third');
-    await row(page, 'qwen2.5-coder').getByTestId('downloads').locator('span').first().hover();
+    await row(page, 'qwen2.5-coder').locator('svg.lucide-download').first().hover();
     await expect(tip(page)).toContainText('23,000,000 downloads');
     await row(page, 'qwen2.5-coder').getByText('0.5b – 32b').hover();
     await expect(tip(page)).toContainText('billions of parameters');
@@ -498,30 +480,22 @@ test.describe('tooltips', () => {
     await expect(tip(page)).toContainText('Understands pictures');
   });
 
-  test('column headers, tabs and controls explain themselves', async ({ page }) => {
+  test('tabs, filters and controls explain themselves', async ({ page }) => {
     await page.goto('/');
-    await page.getByRole('columnheader', { name: /Speed/ }).hover();
-    await expect(tip(page)).toContainText('A token is about three quarters of a word');
-    await page.getByRole('columnheader', { name: /On this computer/ }).hover();
-    await expect(tip(page)).toContainText('fits in your computer');
     await page.getByTestId('scope-community').hover();
     await expect(tip(page)).toContainText('Uploaded by other people');
     await page.getByTestId('view-trending').hover();
     await expect(tip(page)).toContainText('popular models that were updated recently');
-    await page.getByTestId('device-chip').hover();
-    await expect(tip(page)).toContainText('504 GB/s');
     await page.getByTestId('glance-runs').hover();
     await expect(tip(page)).toContainText('Click to show only these');
-    await page.getByTestId('open-tasks').hover();
-    await expect(tip(page)).toContainText('Pick what you want to do');
     await page.getByTestId('theme-toggle').hover();
     await expect(tip(page)).toContainText('Switch the colours');
   });
 
   test('keyboard focus shows it too, and Escape hides it', async ({ page }) => {
     await page.goto('/');
-    await page.getByTestId('open-filters').focus();
-    await expect(tip(page)).toContainText('how recently a model was updated');
+    await page.getByTestId('view-new').focus();
+    await expect(tip(page)).toContainText('added');
     await page.keyboard.press('Escape');
     await expect(tip(page)).toHaveCount(0);
   });

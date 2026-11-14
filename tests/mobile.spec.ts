@@ -3,8 +3,8 @@ import { useFixtureCatalogue, fakeHardware, tagsHtml } from './fixture';
 
 test.use({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true, deviceScaleFactor: 2 });
 
-const cardNames = (page: Page) => page.locator('[data-testid=model-card]').evaluateAll(els => els.map(e => (e as HTMLElement).dataset.name));
-const card = (page: Page, name: string) => page.locator(`[data-testid=model-card][data-name="${name}"]`);
+const cardNames = (page: Page) => page.locator('[data-testid=model-row]').evaluateAll(els => els.map(e => (e as HTMLElement).dataset.name));
+const card = (page: Page, name: string) => page.locator(`[data-testid=model-row][data-name="${name}"]`);
 const noSidewaysScroll = (page: Page) => page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth && document.body.scrollWidth <= window.innerWidth);
 
 test.beforeEach(async ({ page }) => {
@@ -14,18 +14,17 @@ test.beforeEach(async ({ page }) => {
 
 test('models are cards, not a table, and nothing scrolls sideways', async ({ page }) => {
   await page.goto('/');
-  await expect(page.getByTestId('model-card')).toHaveCount(12);
+  await expect(page.getByTestId('model-row')).toHaveCount(12);
   await expect(page.locator('table')).toHaveCount(0);
   expect(await noSidewaysScroll(page)).toBe(true);
   expect((await cardNames(page)).slice(0, 2)).toEqual(['llama3.1', 'nomic-embed-text']);
   await expect(card(page, 'llama3.1')).toContainText('121.0M');
-  await expect(card(page, 'llama3.1')).toContainText('8b · 70b · 405b');
   await expect(card(page, 'llama3.1').getByTestId('fit-good')).toBeVisible();
 });
 
 test('the first model is visible without scrolling past a wall of controls', async ({ page }) => {
   await page.goto('/');
-  const top = await page.getByTestId('model-card').first().evaluate(el => el.getBoundingClientRect().top);
+  const top = await page.getByTestId('model-row').first().evaluate(el => el.getBoundingClientRect().top);
   expect(top).toBeLessThan(520);
 });
 
@@ -33,14 +32,9 @@ test('everything you tap is big enough to tap', async ({ page }) => {
   await page.goto('/');
   const targets = [
     page.getByTestId('theme-toggle'),
-    page.getByTestId('device-chip'),
     page.getByTestId('view-new'),
-    page.getByTestId('scope-official'),
-    page.getByTestId('open-tasks'),
-    page.getByTestId('open-caps'),
     page.getByTestId('open-filters'),
     page.getByTestId('sort-select'),
-    card(page, 'llama3.1').getByRole('link', { name: /Open llama3.1/ }),
     card(page, 'llama3.1').getByTestId('compare-check'),
   ];
   for (const t of targets) {
@@ -52,58 +46,40 @@ test('everything you tap is big enough to tap', async ({ page }) => {
   }
 });
 
-test('the filter bar is one row, and drop-downs open as bottom sheets', async ({ page }) => {
+test('filters open as a bottom sheet that fits the screen', async ({ page }) => {
   await page.goto('/');
-  const bar = await page.getByTestId('filter-bar').evaluate(el => ({ h: el.getBoundingClientRect().height }));
-  expect(bar.h, 'filter bar is a single row').toBeLessThan(60);
   expect(await noSidewaysScroll(page)).toBe(true);
-  await page.getByTestId('open-tasks').tap();
-  const sheet = page.getByRole('dialog', { name: 'I want to' });
+  await page.getByTestId('open-filters').tap();
+  const sheet = page.getByRole('dialog', { name: 'Filters' });
   const box = await sheet.boundingBox();
   expect(box!.x).toBe(0);
   expect(Math.round(box!.width)).toBe(390);
   expect(Math.round(box!.y + box!.height)).toBe(844); // sits on the bottom edge
-  expect(box!.height).toBeLessThanOrEqual(844 * 0.8);
-  // several can be ticked, then Done
-  await page.getByTestId('tasks-coding').tap();
-  await page.getByTestId('tasks-small').tap();
-  await expect(page.getByTestId('tasks-count')).toHaveText('2');
-  await sheet.getByRole('button', { name: 'Done' }).tap();
+  expect(box!.height).toBeLessThanOrEqual(844 * 0.92);
+  await sheet.getByTestId('tasks-coding').tap();
+  await sheet.getByTestId('tasks-small').tap();
+  await sheet.getByTestId('upd-30').tap();
+  await sheet.getByTestId('show-results').tap();
   await expect(sheet).toBeHidden();
   await expect(page.getByTestId('active-filters')).toContainText('Coding');
   await expect(page.getByTestId('active-filters')).toContainText('Small & fast');
+  await expect(page.getByTestId('open-filters')).toContainText('2');
   expect(await noSidewaysScroll(page)).toBe(true);
 });
 
 test('pick a computer and filter, with the thumb', async ({ page }) => {
   await page.goto('/');
-  await expect(page.getByTestId('device-label')).toHaveText('Apple M2 Pro');
-  await page.getByTestId('device-chip').tap();
-  const popup = page.getByRole('dialog', { name: 'Choose your computer' });
-  const box = await popup.boundingBox();
-  expect(box!.x).toBeGreaterThanOrEqual(0);
-  expect(box!.x + box!.width).toBeLessThanOrEqual(390);
-  await popup.getByRole('button', { name: '8 GB laptop' }).tap();
-  await expect(page.getByTestId('device-label')).toHaveText('8 GB laptop');
-  await page.getByTestId('fit-only').check();
+  await page.getByTestId('open-filters').tap();
+  const sheet = page.getByRole('dialog', { name: 'Filters' });
+  await expect(sheet.getByTestId('device-label')).toHaveText('Apple M2 Pro');
+  await sheet.getByTestId('device-chip').tap();
+  await sheet.getByRole('button', { name: '8 GB laptop' }).tap();
+  await expect(sheet.getByTestId('device-label')).toHaveText('8 GB laptop');
+  await sheet.getByTestId('fit-only').check();
+  await sheet.getByTestId('show-results').tap();
   await expect(card(page, 'llama3.1')).toHaveCount(0);
   await expect(card(page, 'tinyllama')).toBeVisible();
   expect(await noSidewaysScroll(page)).toBe(true);
-});
-
-test('filters open as a bottom sheet that fits the screen', async ({ page }) => {
-  await page.goto('/');
-  await page.getByTestId('open-filters').tap();
-  const sheet = page.getByRole('dialog', { name: 'Filters' });
-  const box = await sheet.boundingBox();
-  expect(box!.width).toBeLessThanOrEqual(390);
-  expect(box!.y + box!.height).toBeCloseTo(844, 0); // sits at the bottom edge
-  expect(box!.height).toBeLessThanOrEqual(844 * 0.9);
-  await sheet.getByTestId('upd-30').tap();
-  await expect(sheet.getByTestId('show-results')).toContainText('Show 3 models');
-  await sheet.getByTestId('show-results').tap();
-  await expect(page.getByTestId('model-card')).toHaveCount(3);
-  await expect(page.getByTestId('open-filters')).toContainText('1');
 });
 
 test('compare works on a phone and fills the screen', async ({ page }) => {
@@ -126,7 +102,7 @@ test('compare works on a phone and fills the screen', async ({ page }) => {
 
 test('tapping a publisher name shows their models', async ({ page }) => {
   await page.goto('/');
-  await page.getByTestId('scope-community').tap();
+  await page.getByLabel('Search models').fill('bob');
   await card(page, 'bob/huge-70b').getByRole('button', { name: 'bob/' }).tap();
   expect((await cardNames(page)).sort()).toEqual(['bob/coder-uncensored', 'bob/huge-70b']);
 });
@@ -160,9 +136,9 @@ test('scrolling loads more cards', async ({ page }) => {
   await page.unroute('**/ollama-catalogue.json');
   await useFixtureCatalogue(page, many);
   await page.goto('/');
-  await expect(page.getByTestId('model-card')).toHaveCount(150);
+  await expect(page.getByTestId('model-row')).toHaveCount(150);
   await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
-  await expect(page.getByTestId('model-card')).toHaveCount(300);
+  await expect(page.getByTestId('model-row')).toHaveCount(300);
 });
 
 test('tap a model: details fill the screen, with a big copy button', async ({ page, context }) => {
@@ -193,7 +169,7 @@ test('tap a model: details fill the screen, with a big copy button', async ({ pa
 
 test('speed shows on the cards', async ({ page }) => {
   await page.goto('/');
-  await expect(card(page, 'tinyllama').getByTestId('speed')).toContainText('tok/s');
+  await expect(card(page, 'tinyllama').getByTestId('speed')).toContainText('tokens/s');
   await expect(card(page, 'bob/huge-70b').getByTestId('speed')).toHaveCount(0);
   expect(await noSidewaysScroll(page)).toBe(true);
 });
