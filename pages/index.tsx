@@ -11,13 +11,15 @@ import { DevicePicker } from '@/components/DevicePicker';
 import { CompareDialog } from '@/components/CompareDialog';
 import { FilterSheet } from '@/components/FilterSheet';
 import { Dropdown } from '@/components/Dropdown';
+import { ModelDrawer } from '@/components/ModelDrawer';
+import { SpeedBadge, speedOfFit } from '@/components/SpeedBadge';
 import {
   ExternalLink, Search, ArrowUpDown, ArrowUp, ArrowDown, Code2, Brain, Gauge, Tag, Clock, ImageIcon, MessagesSquare,
   Sparkles, Github, RefreshCw, Info, SlidersHorizontal, GitCompare, Sun, Moon, Flame, Rss, Braces, Star, X,
 } from 'lucide-react';
 
-import { ModelData, ScrapingLog } from '@/lib/types';
-import { scrapeOllamaModels, searchOllama } from '@/lib/clientScraper';
+import { ModelData, ModelVersion, ScrapingLog } from '@/lib/types';
+import { scrapeOllamaModels, searchOllama, fetchModelDetails } from '@/lib/clientScraper';
 import { loadCatalogue } from '@/lib/catalogue';
 import { detectDevice, type Device } from '@/lib/device';
 import { fitOf, type Fit } from '@/lib/fit';
@@ -83,6 +85,7 @@ const SORT_OPTIONS: { id: SortField; label: string }[] = [
   { id: 'downloads', label: 'Downloads' },
   { id: 'updated', label: 'Recently updated' },
   { id: 'name', label: 'Name' },
+  { id: 'speed', label: 'Fastest on my computer' },
   { id: 'size', label: 'Size' },
   { id: 'context', label: 'Context window' },
   { id: 'versions', label: 'Versions' },
@@ -108,6 +111,8 @@ export default function Home() {
   // ---- view state ----
   const [filters, setFilters] = useState<Filters>(DEFAULT_FILTERS);
   const [compare, setCompare] = useState<string[]>([]);
+  const [openName, setOpenName] = useState<string | null>(null); // the model whose details are open
+  const [versionsCache, setVersionsCache] = useState<Record<string, ModelVersion[]>>({});
   const [urlReady, setUrlReady] = useState(false);
   const [device, setDevice] = useState<Device | null>(null);
   const [theme, setTheme] = useState<'dark' | 'light'>('dark');
@@ -210,7 +215,7 @@ export default function Home() {
   useEffect(() => {
     try {
       const saved = JSON.parse(localStorage.getItem(DEVICE_KEY) || 'null');
-      if (saved && typeof saved.memoryGB === 'number') { setDevice({ ...saved, manual: true }); return; }
+      if (saved && typeof saved.memoryGB === 'number') { setDevice({ ...saved, bandwidthGBs: saved.bandwidthGBs || (saved.kind === 'gpu' ? 450 : saved.kind === 'unified' ? 200 : 50), manual: true }); return; }
     } catch { /* ignore */ }
     detectDevice().then(setDevice);
   }, []);
@@ -220,25 +225,27 @@ export default function Home() {
     setDevice(d);
   };
   const memoryGB = device?.memoryGB ?? 10;
+  const bandwidthGBs = device?.bandwidthGBs ?? 50;
 
   // ---- address <-> state (shareable links) ----
   useEffect(() => {
-    const { filters: f, compare: c } = queryToFilters(window.location.search);
+    const { filters: f, compare: c, model: m } = queryToFilters(window.location.search);
     setFilters(f);
     setCompare(c);
+    setOpenName(m || null);
     setUrlReady(true);
-    const onPop = () => { const r = queryToFilters(window.location.search); setFilters(r.filters); setCompare(r.compare); };
+    const onPop = () => { const r = queryToFilters(window.location.search); setFilters(r.filters); setCompare(r.compare); setOpenName(r.model || null); };
     window.addEventListener('popstate', onPop);
     return () => window.removeEventListener('popstate', onPop);
   }, []);
   useEffect(() => {
     if (!urlReady) return;
     const id = setTimeout(() => {
-      const next = `${window.location.pathname}${filtersToQuery(filters, compare)}`;
+      const next = `${window.location.pathname}${filtersToQuery(filters, compare, openName || '')}`;
       if (next !== `${window.location.pathname}${window.location.search}`) window.history.replaceState(null, '', next);
     }, 250);
     return () => clearTimeout(id);
-  }, [filters, compare, urlReady]);
+  }, [filters, compare, openName, urlReady]);
 
   // ---- every model we know about ----
   const allModels = useMemo(() => {
@@ -265,8 +272,13 @@ export default function Home() {
     models.forEach(add);
     catalogue.forEach(add);
     liveResults.forEach(add);
+    // versions fetched when a model's details were opened: real sizes instead of estimates
+    for (const [name, versions] of Object.entries(versionsCache)) {
+      const m = byName.get(name);
+      if (m && !m.versions.length && versions.length) byName.set(name, { ...m, versions });
+    }
     return Array.from(byName.values());
-  }, [models, catalogue, liveResults]);
+  }, [models, catalogue, liveResults, versionsCache]);
 
   const officialCount = useMemo(() => allModels.filter(m => !isCommunity(m)).length, [allModels]);
   const growthKnown = useMemo(() => hasGrowthData(allModels), [allModels]);
@@ -280,10 +292,10 @@ export default function Home() {
   // ---- the list ----
   const liveNames = useMemo(() => new Set(liveHits[filters.q.trim().toLowerCase()] || []), [liveHits, filters.q]);
   const { models: results, hiddenDuplicates } = useMemo(
-    () => applyFilters(allModels, filters, memoryGB, Date.now(), liveNames),
-    [allModels, filters, memoryGB, liveNames],
+    () => applyFilters(allModels, filters, { memoryGB, bandwidthGBs }, Date.now(), liveNames),
+    [allModels, filters, memoryGB, bandwidthGBs, liveNames],
   );
-  useEffect(() => { setVisibleCount(PAGE_SIZE); }, [filters, memoryGB]);
+  useEffect(() => { setVisibleCount(PAGE_SIZE); }, [filters, memoryGB, bandwidthGBs]);
   const visible = useMemo(() => results.slice(0, visibleCount), [results, visibleCount]);
   const hasMore = visibleCount < results.length;
   useEffect(() => {
@@ -295,7 +307,30 @@ export default function Home() {
     return () => observer.disconnect();
   }, [sentinel, hasMore, visible.length]);
 
-  const fitFor = useCallback((m: ModelData): Fit => fitOf(m, memoryGB), [memoryGB]);
+  const fitFor = useCallback((m: ModelData): Fit => fitOf(m, memoryGB, bandwidthGBs), [memoryGB, bandwidthGBs]);
+
+  // ---- details drawer ----
+  const openModel = openName ? allModels.find(m => m.name === openName) || null : null;
+  const loadVersions = useCallback(async (m: ModelData): Promise<ModelVersion[]> => {
+    if (versionsCache[m.name]) return versionsCache[m.name];
+    const path = new URL(m.url).pathname; // "/library/llama3.1" or "/user/model"
+    const versions = await fetchModelDetails(path);
+    if (versions.length) setVersionsCache(c => ({ ...c, [m.name]: versions }));
+    return versions;
+  }, [versionsCache]);
+
+  // ---- at a glance: what the computer can run, and what is new ----
+  const glance = useMemo(() => {
+    let runs = 0;
+    let fast = 0;
+    let fresh = 0;
+    for (const m of allModels) {
+      const f = fitOf(m, memoryGB, bandwidthGBs);
+      if (f.status === 'good' || f.status === 'tight') { runs++; if (f.tps >= 40) fast++; }
+      if (isNewModel(m)) fresh++;
+    }
+    return { runs, fast, fresh };
+  }, [allModels, memoryGB, bandwidthGBs]);
 
   // ---- compare ----
   const byName = useMemo(() => new Map(allModels.map(m => [m.name, m])), [allModels]);
@@ -313,7 +348,7 @@ export default function Home() {
 
   const handleSort = (field: SortField) => {
     if (filters.sort === field) patch({ dir: filters.dir === 'asc' ? 'desc' : 'asc' });
-    else patch({ sort: field, dir: field === 'downloads' || field === 'updated' || field === 'context' ? 'desc' : 'asc' });
+    else patch({ sort: field, dir: field === 'downloads' || field === 'updated' || field === 'context' || field === 'speed' ? 'desc' : 'asc' });
   };
   const sortIcon = (field: SortField) => {
     if (filters.sort !== field) return <ArrowUpDown className="ml-2 h-4 w-4 opacity-40" />;
@@ -349,6 +384,7 @@ export default function Home() {
     ...(filters.maxGB > 0 ? [{ key: 'max', label: `Under ${filters.maxGB} GB`, remove: () => patch({ maxGB: 0 }) }] : []),
     ...(filters.minContextK > 0 ? [{ key: 'ctx', label: `${filters.minContextK}K+ context`, remove: () => patch({ minContextK: 0 }) }] : []),
     ...(filters.dedupe ? [{ key: 'dedupe', label: 'No near-duplicates', remove: () => patch({ dedupe: false }) }] : []),
+    ...(filters.minTps > 0 ? [{ key: 'tps', label: `${filters.minTps}+ tokens/s here`, remove: () => patch({ minTps: 0 }) }] : []),
   ];
 
   const th = 'py-3 text-xs font-medium uppercase tracking-wide text-zinc-500';
@@ -445,6 +481,20 @@ export default function Home() {
           <div className="lg:ml-auto"><DevicePicker device={device} onChange={changeDevice} fitOnly={filters.fitOnly} onFitOnly={v => patch({ fitOnly: v })} /></div>
         </div>
 
+        {/* At a glance */}
+        <div className="mt-3 flex flex-wrap items-center gap-x-5 gap-y-1 text-sm text-zinc-400" data-testid="glance">
+          <button onClick={() => patch({ fitOnly: !filters.fitOnly })} className="hover:text-white" data-testid="glance-runs">
+            <span className="font-semibold text-emerald-400 tabular-nums">{glance.runs.toLocaleString()}</span> run on {device?.manual ? 'your' : 'this'} computer
+          </button>
+          <button onClick={() => patch({ minTps: filters.minTps === 40 ? 0 : 40, fitOnly: false })} className="hover:text-white" data-testid="glance-fast">
+            <span className="font-semibold text-lime-400 tabular-nums">{glance.fast.toLocaleString()}</span> write 40+ tokens per second
+          </button>
+          <button onClick={() => patch({ view: 'new' })} className="hover:text-white" data-testid="glance-new">
+            <span className="font-semibold text-blue-400 tabular-nums">{glance.fresh.toLocaleString()}</span> new or updated lately
+          </button>
+          <span className="hidden text-xs text-zinc-600 lg:ml-auto lg:inline">Click any model for its speed, versions and install command</span>
+        </div>
+
         {/* Which models: source tabs on the left, view on the right */}
         <div className="mt-4 flex flex-wrap items-end justify-between gap-x-6 gap-y-2 border-b border-zinc-800">
           <div className="-mb-px flex max-w-full overflow-x-auto" role="tablist" aria-label="Which models to show">
@@ -509,7 +559,7 @@ export default function Home() {
                 {c.label}<X className="h-3.5 w-3.5 text-zinc-400" />
               </button>
             ))}
-            <button onClick={() => patch({ caps: [], tasks: [], owner: '', updatedDays: 0, maxGB: 0, minContextK: 0, dedupe: false })} className="inline-flex h-8 items-center rounded-full px-2.5 text-zinc-400 hover:text-white">Clear all</button>
+            <button onClick={() => patch({ caps: [], tasks: [], owner: '', updatedDays: 0, maxGB: 0, minContextK: 0, dedupe: false, minTps: 0 })} className="inline-flex h-8 items-center rounded-full px-2.5 text-zinc-400 hover:text-white">Clear all</button>
           </div>
         )}
 
@@ -555,6 +605,7 @@ export default function Home() {
                 canSelect={compare.length < MAX_COMPARE}
                 onToggle={() => toggleCompare(m.name)}
                 onOwner={owner => patch({ owner, scope: 'community' })}
+                onOpen={() => setOpenName(m.name)}
                 relativeTime={relativeTime}
               />
             ))}
@@ -569,6 +620,7 @@ export default function Home() {
                     <TableHead className="w-12 pl-4"><span className="sr-only">Compare</span></TableHead>
                     <TableHead className={sortable} onClick={() => handleSort('name')}><div className="flex items-center">Model {sortIcon('name')}</div></TableHead>
                     <TableHead className={th}>On {device?.manual ? 'your' : 'this'} computer</TableHead>
+                    <TableHead className={sortable} onClick={() => handleSort('speed')} title="Estimated tokens per second on your computer (about 0.75 words each)"><div className="flex items-center">Speed {sortIcon('speed')}</div></TableHead>
                     <TableHead className={sortable} onClick={() => handleSort('size')}><div className="flex items-center">Size {sortIcon('size')}</div></TableHead>
                     <TableHead className={`${th} hidden lg:table-cell`}>Capabilities</TableHead>
                     <TableHead className={sortable} onClick={() => handleSort('downloads')}><div className="flex items-center">Downloads {sortIcon('downloads')}</div></TableHead>
@@ -584,13 +636,22 @@ export default function Home() {
                     const picked = compare.includes(model.name);
                     const ctx = maxContextK(model);
                     return (
-                      <TableRow key={model.name} data-testid="model-row" data-name={model.name} className={`border-zinc-900 transition-colors hover:bg-zinc-900/60 ${picked ? 'bg-blue-500/5' : ''}`}>
+                      <TableRow
+                        key={model.name}
+                        data-testid="model-row"
+                        data-name={model.name}
+                        tabIndex={0}
+                        onClick={() => setOpenName(model.name)}
+                        onKeyDown={e => { if (e.key === 'Enter' && e.target === e.currentTarget) setOpenName(model.name); }}
+                        className={`cursor-pointer border-zinc-900 transition-colors hover:bg-zinc-900/60 focus-visible:bg-zinc-900 focus-visible:outline-none ${picked ? 'bg-blue-500/5' : ''}`}
+                      >
                         <TableCell className="w-12 py-3 pl-4">
                           <input
                             type="checkbox"
                             checked={picked}
                             disabled={!picked && compare.length >= MAX_COMPARE}
                             onChange={() => toggleCompare(model.name)}
+                            onClick={e => e.stopPropagation()}
                             aria-label={`Compare ${model.name}`}
                             data-testid="compare-check"
                             className="h-4 w-4 cursor-pointer accent-blue-500"
@@ -599,23 +660,24 @@ export default function Home() {
                         <TableCell className="py-3">
                           <div className="text-[15px] font-medium text-white" data-testid="model-name">
                             {owner ? (
-                              <><button onClick={() => patch({ owner, scope: 'community' })} title={`Show everything by ${owner}`} className="font-normal text-zinc-500 hover:text-zinc-300">{owner}/</button>{model.name.slice(owner.length + 1)}</>
+                              <><button onClick={e => { e.stopPropagation(); patch({ owner, scope: 'community' }); }} title={`Show everything by ${owner}`} className="font-normal text-zinc-500 hover:text-zinc-300">{owner}/</button>{model.name.slice(owner.length + 1)}</>
                             ) : model.name}
                             {isNewModel(model) && daysSince(model.firstSeen) <= 30 && <Badge className="ml-2 border-transparent bg-blue-500/20 text-[10px] uppercase text-blue-300">New</Badge>}
                           </div>
                           <div className="mt-0.5 max-w-xl truncate text-sm text-zinc-500">{model.description}</div>
                         </TableCell>
                         <TableCell className="py-3"><FitBadge fit={fit} /></TableCell>
+                        <TableCell className="py-3 text-sm" data-testid="speed-cell"><SpeedBadge tps={speedOfFit(fit)} compact /></TableCell>
                         <TableCell className="py-3">
                           <div className="font-mono text-sm text-zinc-100 whitespace-nowrap">{sizeSummary(model)}</div>
                           {(model.versions.length || model.tagsCount) ? <div className="text-xs text-zinc-500">{model.versions.length || model.tagsCount} versions</div> : null}
                         </TableCell>
                         <TableCell className="hidden py-3 lg:table-cell">
-                          <div className="flex flex-wrap gap-1">
-                            {model.capabilities.slice(0, 3).map(c => (
+                          <div className="flex flex-nowrap items-center gap-1 whitespace-nowrap" title={model.capabilities.join(', ')}>
+                            {model.capabilities.slice(0, 2).map(c => (
                               <span key={c} className="inline-flex items-center gap-1 rounded-md bg-zinc-800/70 px-2 py-0.5 text-xs capitalize text-zinc-300">{capabilityIcon(c)}{c.toLowerCase()}</span>
                             ))}
-                            {model.capabilities.length > 3 && <span className="px-1 text-xs text-zinc-500">+{model.capabilities.length - 3}</span>}
+                            {model.capabilities.length > 2 && <span className="px-1 text-xs text-zinc-500">+{model.capabilities.length - 2}</span>}
                           </div>
                         </TableCell>
                         <TableCell className="py-3 text-sm tabular-nums text-zinc-200" data-testid="downloads">
@@ -625,7 +687,7 @@ export default function Home() {
                         <TableCell className="hidden whitespace-nowrap py-3 text-sm text-zinc-400 xl:table-cell">{model.updated ? relativeTime(model.updated) : '—'}</TableCell>
                         <TableCell className="hidden py-3 font-mono text-sm text-zinc-300 2xl:table-cell">{ctx ? (ctx >= 1000 ? `${ctx / 1000}M` : `${ctx}K`) : <span className="text-zinc-600">—</span>}</TableCell>
                         <TableCell className="w-14 py-3 pr-4 text-right">
-                          <a href={model.url} target="_blank" rel="noopener noreferrer" aria-label={`Visit ${model.name}`} className="inline-flex h-9 w-9 items-center justify-center rounded-md text-zinc-400 hover:bg-zinc-800 hover:text-white"><ExternalLink className="h-4 w-4" /></a>
+                          <a href={model.url} target="_blank" rel="noopener noreferrer" onClick={e => e.stopPropagation()} aria-label={`Visit ${model.name}`} className="inline-flex h-9 w-9 items-center justify-center rounded-md text-zinc-400 hover:bg-zinc-800 hover:text-white"><ExternalLink className="h-4 w-4" /></a>
                         </TableCell>
                       </TableRow>
                     );
@@ -667,6 +729,19 @@ export default function Home() {
         </div>
       )}
 
+      {openModel && (
+        <ModelDrawer
+          model={openModel}
+          device={device}
+          loadVersions={loadVersions}
+          relativeTime={relativeTime}
+          onClose={() => setOpenName(null)}
+          onOwner={owner => patch({ owner, scope: 'community' })}
+          compareSelected={compare.includes(openModel.name)}
+          canCompare={compare.length < MAX_COMPARE}
+          onToggleCompare={() => toggleCompare(openModel.name)}
+        />
+      )}
       {showFilters && <FilterSheet filters={filters} onChange={patch} onClose={() => setShowFilters(false)} resultCount={results.length} hiddenDuplicates={hiddenDuplicates} />}
       {showCompare && compared.length >= 2 && (
         <CompareDialog

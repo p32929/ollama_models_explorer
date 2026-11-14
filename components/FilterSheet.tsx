@@ -68,6 +68,12 @@ export function FilterSheet({ filters, onChange, onClose, resultCount, hiddenDup
               <Chip key={k} active={filters.minContextK === k} onClick={() => onChange({ minContextK: k as number })} testid={`ctx-${k}`}>{label}</Chip>
             ))}
           </Group>
+          <Group title="Speed on your computer">
+            {[[0, 'Any'], [10, '10+ tokens/s'], [20, '20+ tokens/s'], [40, '40+ tokens/s']].map(([t, label]) => (
+              <Chip key={t} active={filters.minTps === t} onClick={() => onChange({ minTps: t as number })} testid={`tps-${t}`}>{label}</Chip>
+            ))}
+            <p className="w-full text-xs text-zinc-500">A token is about three quarters of a word. 20 tokens/s is faster than most people read.</p>
+          </Group>
           <Group title="Duplicates">
             <Chip active={filters.dedupe} onClick={() => onChange({ dedupe: !filters.dedupe })} testid="dedupe">
               Hide near-duplicates
@@ -82,7 +88,7 @@ export function FilterSheet({ filters, onChange, onClose, resultCount, hiddenDup
         </div>
         <div className="flex gap-2 border-t border-zinc-800 p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
           <button
-            onClick={() => onChange({ updatedDays: 0, maxGB: 0, minContextK: 0, dedupe: false, owner: '', caps: [], tasks: [], fitOnly: false })}
+            onClick={() => onChange({ updatedDays: 0, maxGB: 0, minContextK: 0, dedupe: false, owner: '', caps: [], tasks: [], fitOnly: false, minTps: 0 })}
             className="h-11 flex-1 rounded-lg border border-zinc-700 text-sm text-zinc-200 hover:bg-zinc-900"
             disabled={active === 0}
           >

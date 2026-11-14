@@ -4,30 +4,33 @@ A modern, dark-themed UI for exploring and filtering Ollama AI models. This Next
 
 **Live:** https://ollama-models-explorer.vercel.app/
 
-![Ollama Models Explorer: coding models that run on a 32 GB laptop](docs/screenshots/desktop.png)
+![Ollama Models Explorer: coding models that run on an Apple M2 Pro, with estimated speed](docs/screenshots/desktop.png)
 
 <p align="center">
+  <img src="docs/screenshots/details.png" width="49%" alt="Details panel: will it run, how fast, install command, every version">
   <img src="docs/screenshots/compare.png" width="49%" alt="Comparing three models side by side">
-  <img src="docs/screenshots/trending.png" width="49%" alt="The Trending view">
 </p>
 
 <p align="center">
   <img src="docs/screenshots/phone.png" height="460" alt="On a phone: models are cards">
-  <img src="docs/screenshots/phone-picks.png" height="460" alt="Picking what you want to do, several at once">
+  <img src="docs/screenshots/phone-details.png" height="460" alt="The details panel on a phone">
 </p>
 
 ## Features
 
 **Every model on Ollama.** The ~270 official models (with every version, size and context window) **and the 17,000+ community models** (`user/model-name`), in Official / Community / All tabs.
 
-**Will it run on my computer?** The page finds your graphics card (or Apple chip) and memory by itself, with nothing to type, and marks every model **Runs well / Tight fit / Too big / Cloud**. If the guess is wrong, one tap picks the closest computer. "Only show what runs on it" hides the rest. (Browsers hide exact specs, so it is an estimate: official models use their real download sizes, the rest are estimated from the parameter count.)
+**Will it run on my computer, and how fast?** The page finds your graphics card (or Apple chip) and memory by itself, with nothing to type, marks every model **Runs well / Tight fit / Too big / Cloud**, and estimates **tokens per second** (about 0.75 words each), for example `~27 tokens/s`. If the guess is wrong, one tap picks the closest computer. "Only show what runs on it" hides the rest. (Browsers hide exact specs, so it is an estimate. Speed = memory speed × 0.65 ÷ the model's size; mixture-of-experts models, which only use part of themselves for each word, are handled; expect ±30%. Official models use real download sizes, the rest are estimated from the parameter count.)
+
+**Click any model** for a details panel: will it run and how fast, the exact `ollama run` command (with a copy button, including the best version for your computer), every version with its size and speed, context window, downloads and more.
 
 **Find the right one**
 - **I want to…** (pick several, a model must match all): Coding, Small & fast, Images, Reasoning, Embeddings, Translation, Chat & roleplay, Math, Tool use
 - **Capabilities** (also several): Tools, Vision, Thinking, Embedding, Audio, Cloud…
 - **Search** by any words in the name, description or capabilities; **Search ollama.com live** for anything newer than the saved list
 - **Filters**: updated recently, size, context window, publisher (click a name), hide near-duplicates, capabilities
-- **Sort** by downloads, last update, name, size, context window or versions
+- **Sort** by downloads, last update, name, size, context window, versions or **speed on your computer**; **filter** by minimum speed (10, 20 or 40+ tokens/s)
+- **At a glance** line: how many models run on your computer, how many are fast, how many are new
 
 **Compare** up to four models side by side (size, context, downloads, whether each runs on your computer).
 
@@ -40,7 +43,7 @@ A modern, dark-themed UI for exploring and filtering Ollama AI models. This Next
 **Light and dark mode**, and a **Model of the week**.
 
 **For developers**
-- JSON API: `GET /api/v1/models?q=coder&scope=community&cap=tools&sort=downloads&limit=50` (also `owner`, `updated`, `max_gb`, `min_context_k`, `new=1`, `memory_gb=16` to get a `fit` for that much memory). CORS is open.
+- JSON API: `GET /api/v1/models?q=coder&scope=community&cap=tools&sort=downloads&limit=50` (also `owner`, `updated`, `max_gb`, `min_context_k`, `new=1`, `memory_gb=16&bandwidth_gbs=200` to get a `fit` and an estimated `tokens_per_second` for that computer, `min_tps=20`, `sort=speed`). CORS is open.
 - RSS feed of new and updated models: `/feed.xml`
 
 ### Where the full list comes from

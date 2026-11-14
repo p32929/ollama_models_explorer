@@ -74,16 +74,20 @@ export function parseModelListItem(li: Element): ModelData | null {
   };
 }
 
-async function fetchModelDetails(modelPath: string): Promise<ModelVersion[]> {
+/**
+ * Every version (tag) of a model with its size, context window and input types.
+ * Works for official models ("/library/llama3.1") and community ones ("/user/model").
+ */
+export async function fetchModelDetails(modelPath: string): Promise<ModelVersion[]> {
   try {
     // The model page only previews a few tags; /tags lists every version.
-    const doc = await fetchViaProxy(`${modelPath}/tags`);
+    const doc = await fetchViaProxy(`${modelPath.replace(/\/$/, '')}/tags`);
     const versions: ModelVersion[] = [];
 
     doc.querySelectorAll('div.group').forEach(row => {
-      const link = row.querySelector('a[href^="/library/"]');
+      const link = row.querySelector('a[href*=":"]');
       const href = link?.getAttribute('href');
-      if (!href || !href.includes(':')) return;
+      if (!href) return;
 
       const grid = row.querySelector('div.grid-cols-12');
       if (!grid) return;
@@ -100,8 +104,11 @@ async function fetchModelDetails(modelPath: string): Promise<ModelVersion[]> {
       // so fall back to the usage tier ("Medium Usage") from the digest line.
       const size = cells[0]?.textContent?.trim() || (metaParts.length > 2 ? metaParts[1] : '');
 
+      // The exact name to give to `ollama run` is in a hidden field ("huihui_ai/qwen3-abliterated:8b")
+      const name = row.querySelector('input.command')?.getAttribute('value') || href.replace(/^\/(library\/)?/, '');
+
       versions.push({
-        name: href.replace('/library/', ''),
+        name,
         size,
         context: cells[1]?.textContent?.trim() || '',
         input: cells[2]?.textContent?.trim() || '',
@@ -119,7 +126,6 @@ async function fetchModelDetails(modelPath: string): Promise<ModelVersion[]> {
         ? { ...existing, ...version, updated: version.updated || existing.updated }
         : version;
     });
-
     return Object.values(byName);
   } catch (error) {
     console.error(`Error fetching model details from ${modelPath}:`, error);

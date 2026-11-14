@@ -53,3 +53,8 @@ export async function fakeHardware(page: Page, opts: { gpu?: string; platform?: 
     } as any;
   }, opts);
 }
+
+/** The HTML of a model's /tags page: [name, size, context] for each version. */
+export function tagsHtml(rows: [string, string, string][]): string {
+  return rows.map(([name, size, ctx]) => `<div class="group px-4 py-3"><div class="hidden md:flex flex-col"><div class="grid grid-cols-12 items-center"><span class="col-span-6"><a href="/${name}">${name}</a><input class="command hidden" value="${name}" /></span><p class="col-span-2">${size}</p><p class="col-span-2">${ctx}</p><div class="col-span-2">Text</div></div><div class="flex"><span class="font-mono">abc123</span>&nbsp;·&nbsp;1 year ago</div></div></div>`).join('');
+}

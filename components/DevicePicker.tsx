@@ -61,7 +61,7 @@ export function DevicePicker({ device, onChange, fitOnly, onFitOnly }: Props) {
                 return (
                   <button
                     key={p.label}
-                    onClick={() => { onChange({ label: p.label, memoryGB: p.memoryGB, kind: p.kind, confidence: 'detected', manual: true }); setOpen(false); }}
+                    onClick={() => { onChange({ label: p.label, memoryGB: p.memoryGB, bandwidthGBs: p.bandwidthGBs, kind: p.kind, confidence: 'detected', manual: true }); setOpen(false); }}
                     className={`flex items-center justify-between gap-1 rounded-md border px-2 py-2 text-xs text-left transition-colors ${selected ? 'border-blue-500 bg-blue-500/10 text-white' : 'border-zinc-700 text-zinc-300 hover:bg-zinc-800'}`}
                   >
                     <span>{p.label}</span>

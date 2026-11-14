@@ -3,6 +3,7 @@ import { X, ExternalLink } from 'lucide-react';
 import type { ModelData } from '@/lib/types';
 import type { Fit } from '@/lib/fit';
 import { FitBadge } from './FitBadge';
+import { SpeedBadge, speedOfFit } from './SpeedBadge';
 import { ownerOf, sizeSummary, maxContextK } from '@/lib/filter';
 import { formatCount } from '@/lib/units';
 
@@ -34,6 +35,7 @@ export function CompareDialog({ models, fitOf, deviceLabel, relativeTime, onRemo
     { label: 'About', cell: m => <span className="line-clamp-5 text-zinc-300">{m.description || '—'}</span> },
     { label: 'Capabilities', cell: m => (m.capabilities.length ? <span className="capitalize">{m.capabilities.join(', ').toLowerCase()}</span> : '—') },
     { label: `On ${deviceLabel}`, cell: m => <FitBadge fit={fitOf(m)} /> },
+    { label: 'Speed here', cell: m => <SpeedBadge tps={speedOfFit(fitOf(m))} /> },
     { label: 'Sizes', cell: m => sizeSummary(m) },
     { label: 'Context window', cell: m => { const c = maxContextK(m); return c ? <span className={c === topContext ? 'text-emerald-400 font-medium' : ''}>{c >= 1000 ? `${c / 1000}M` : `${c}K`}</span> : <span className="text-zinc-500">not listed</span>; } },
     { label: 'Downloads', cell: m => <span className={(m.pullsCount || 0) === topDownloads && topDownloads > 0 ? 'text-emerald-400 font-medium' : ''}>{m.pullsCount ? formatCount(m.pullsCount) : '—'}</span> },

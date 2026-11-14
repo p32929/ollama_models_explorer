@@ -1,5 +1,5 @@
 import { test, expect, type Page } from '@playwright/test';
-import { useFixtureCatalogue, fakeHardware } from './fixture';
+import { useFixtureCatalogue, fakeHardware, tagsHtml } from './fixture';
 
 test.use({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true, deviceScaleFactor: 2 });
 
@@ -163,4 +163,37 @@ test('scrolling loads more cards', async ({ page }) => {
   await expect(page.getByTestId('model-card')).toHaveCount(150);
   await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
   await expect(page.getByTestId('model-card')).toHaveCount(300);
+});
+
+test('tap a model: details fill the screen, with a big copy button', async ({ page, context }) => {
+  await context.grantPermissions(['clipboard-read', 'clipboard-write']);
+  await page.route('**/api/proxy?*', route => route.fulfill({ contentType: 'text/html', body: tagsHtml([['llava:7b', '4.7GB', '32K'], ['llava:13b', '8.0GB', '32K']]) }));
+  await page.goto('/');
+  await card(page, 'llava').locator('h3').tap();
+  const drawer = page.getByTestId('model-drawer');
+  const box = await drawer.boundingBox();
+  expect([Math.round(box!.x), Math.round(box!.width), Math.round(box!.height)]).toEqual([0, 390, 844]);
+  await expect(drawer.getByTestId('drawer-title')).toHaveText('llava');
+  await expect(drawer.getByTestId('variant-row')).toHaveCount(2);
+  expect(await noSidewaysScroll(page)).toBe(true);
+  const copy = drawer.getByTestId('copy-run');
+  const c = await copy.boundingBox();
+  expect(Math.min(c!.width, c!.height)).toBeGreaterThanOrEqual(36);
+  await copy.tap();
+  expect(await page.evaluate(() => navigator.clipboard.readText())).toBe('ollama run llava');
+  // the bottom buttons are reachable and big
+  for (const b of [drawer.getByTestId('drawer-compare'), drawer.getByRole('link', { name: /Open on ollama.com$/ }).last()]) {
+    const bb = await b.boundingBox();
+    expect(bb!.height).toBeGreaterThanOrEqual(40);
+    expect(bb!.y + bb!.height).toBeLessThanOrEqual(844);
+  }
+  await drawer.getByTestId('drawer-close').tap();
+  await expect(drawer).toBeHidden();
+});
+
+test('speed shows on the cards', async ({ page }) => {
+  await page.goto('/');
+  await expect(card(page, 'tinyllama').getByTestId('speed')).toContainText('tok/s');
+  await expect(card(page, 'bob/huge-70b').getByTestId('speed')).toHaveCount(0);
+  expect(await noSidewaysScroll(page)).toBe(true);
 });

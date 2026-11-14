@@ -1,5 +1,5 @@
 import { test, expect, type Page } from '@playwright/test';
-import { useFixtureCatalogue, fakeHardware, ROWS } from './fixture';
+import { useFixtureCatalogue, fakeHardware, ROWS, tagsHtml } from './fixture';
 
 const rowNames = (page: Page) => page.locator('[data-testid=model-row]').evaluateAll(els => els.map(e => (e as HTMLElement).dataset.name));
 const row = (page: Page, name: string) => page.locator(`[data-testid=model-row][data-name="${name}"]`);
@@ -323,4 +323,142 @@ test('the page has no console errors', async ({ page }) => {
   await page.getByTestId('open-filters').click();
   await page.getByTestId('show-results').click();
   expect(errors).toEqual([]);
+});
+
+const speedOf = async (page: Page, name: string) => {
+  const text = await row(page, name).getByTestId('speed').innerText();
+  return Number(/~(\d+(?:\.\d+)?)/.exec(text)![1]);
+};
+
+test.describe('speed', () => {
+  test('shows tokens per second for what fits, worked out from the memory speed', async ({ page }) => {
+    await page.goto('/');
+    // RTX 4070: 504 GB/s. qwen2.5-coder: the 14b (8.4 GB) is the biggest that fits, so 0.65 x 504 / 8.4 = about 39
+    expect(await speedOf(page, 'qwen2.5-coder')).toBeGreaterThanOrEqual(37);
+    expect(await speedOf(page, 'qwen2.5-coder')).toBeLessThanOrEqual(41);
+    // tinyllama (1.1b, under 1 GB) is far faster
+    expect(await speedOf(page, 'tinyllama')).toBeGreaterThan(300);
+    // nothing to say for what does not fit, is a cloud model, or has no size
+    await expect(row(page, 'bob/huge-70b').getByTestId('speed-none')).toBeVisible();
+    await expect(row(page, 'gpt-oss-cloud').getByTestId('speed-none')).toBeVisible();
+    await expect(row(page, 'nomic-embed-text').getByTestId('speed-none')).toBeVisible();
+    await expect(row(page, 'tinyllama').getByTestId('speed')).toHaveAttribute('data-tier', 'fast');
+  });
+
+  test('a slower computer gets slower numbers', async ({ page }) => {
+    await page.goto('/');
+    const fast = await speedOf(page, 'qwen2.5-coder');
+    await page.getByTestId('device-chip').click();
+    await page.getByRole('button', { name: '16 GB laptop' }).click(); // 50 GB/s
+    const slow = await speedOf(page, 'qwen2.5-coder');
+    expect(slow).toBeLessThan(fast / 4);
+    await expect(row(page, 'qwen2.5-coder').getByTestId('speed')).toHaveAttribute('data-tier', /ok|slow|good/);
+  });
+
+  test('sort by the fastest on your computer, and keep only the fast ones', async ({ page }) => {
+    await page.goto('/');
+    await page.getByTestId('sort-select').selectOption('speed');
+    const names = await rowNames(page);
+    expect(names[0]).toBe('tinyllama');
+    expect(names.slice(-3)).toContain('bob/huge-70b'); // does not fit: last
+    await expect(page).toHaveURL(/sort=speed/);
+
+    await page.getByTestId('sort-select').selectOption('auto');
+    await page.getByTestId('open-filters').click();
+    await page.getByTestId('tps-40').click();
+    await page.getByTestId('show-results').click();
+    const fast = await rowNames(page);
+    expect(fast).toContain('tinyllama');
+    expect(fast).not.toContain('bob/huge-70b');
+    for (const n of fast) expect(await speedOf(page, n!), n).toBeGreaterThanOrEqual(40);
+    await expect(page.getByTestId('active-filters')).toContainText('40+ tokens/s');
+    await expect(page).toHaveURL(/tps=40/);
+  });
+
+  test('the at-a-glance line counts what runs here, and each count is a shortcut', async ({ page }) => {
+    await page.goto('/');
+    await expect(page.getByTestId('glance-runs')).toContainText('run on this computer');
+    const runs = Number(/\d+/.exec(await page.getByTestId('glance-runs').innerText())![0]);
+    expect(runs).toBeGreaterThan(5);
+    await page.getByTestId('glance-runs').click();
+    await expect(counter(page)).toHaveText(new RegExp(`^${runs} of 12`));
+    await page.getByTestId('glance-new').click();
+    await expect(page).toHaveURL(/view=new/);
+  });
+});
+
+test.describe('model details', () => {
+  test.beforeEach(async ({ page, context }) => {
+    await context.grantPermissions(['clipboard-read', 'clipboard-write']);
+    await page.route('**/api/proxy?*', route => route.fulfill({ contentType: 'text/html', body: tagsHtml([['bob/coder-uncensored:7b', '4.7GB', '32K'], ['bob/coder-uncensored:14b', '9.0GB', '32K'], ['bob/coder-uncensored:latest', '4.7GB', '32K']]) }));
+  });
+
+  test('click a model to see everything: will it run, how fast, how to install, every version', async ({ page }) => {
+    await page.goto('/');
+    await row(page, 'bob/coder-uncensored').click();
+    const drawer = page.getByTestId('model-drawer');
+    await expect(drawer).toBeVisible();
+    await expect(page).toHaveURL(/model=bob%2Fcoder-uncensored/);
+    await expect(drawer.getByTestId('drawer-title')).toHaveText('coder-uncensored');
+    await expect(drawer).toContainText('by bob');
+    await expect(drawer.getByTestId('drawer-fit').getByTestId('fit-good')).toBeVisible(); // 7b runs well on 12 GB; the 14b only just fits
+    await expect(drawer.getByTestId('drawer-fit').getByTestId('speed')).toBeVisible();
+    await expect(drawer.getByTestId('drawer-speed-text')).toContainText('words per second');
+    // the real versions replace the estimates
+    await expect(drawer.getByTestId('variant-row')).toHaveCount(2); // one per size: 7b and 14b ('latest' is the same file as the 7b)
+    await drawer.getByTestId('show-all-versions').click();
+    await expect(drawer.getByTestId('variant-row')).toHaveCount(3);
+    await expect(drawer.getByTestId('variants')).toContainText('9 GB');
+    await expect(drawer.getByTestId('variants')).not.toContainText(/~\d+(\.\d+)? GB/); // real sizes, not estimates
+    await expect(drawer.getByTestId('variant-row').filter({ hasText: '14b' })).toHaveAttribute('data-status', 'tight');
+    // the exact command for what suits this computer
+    await expect(drawer.getByTestId('run-command')).toHaveText('ollama run bob/coder-uncensored');
+    await expect(drawer.getByTestId('run-command-best')).toHaveText('ollama run bob/coder-uncensored:7b');
+    await drawer.getByTestId('copy-run-best').click();
+    await expect(drawer.getByTestId('copy-run-best')).toContainText('Copied');
+    expect(await page.evaluate(() => navigator.clipboard.readText())).toBe('ollama run bob/coder-uncensored:7b');
+    // and the table behind it now uses the real sizes
+    await page.keyboard.press('Escape');
+    await expect(drawer).toBeHidden();
+    await expect(page).not.toHaveURL(/model=/);
+  });
+
+  test('a shared link opens the details', async ({ page }) => {
+    await page.goto('/?model=llava');
+    await expect(page.getByTestId('model-drawer')).toBeVisible();
+    await expect(page.getByTestId('drawer-title')).toHaveText('llava');
+  });
+
+  test('model without a good fit explains why, and cloud models say so', async ({ page }) => {
+    await page.goto('/?model=bob/huge-70b');
+    await expect(page.getByTestId('drawer-fit')).toContainText('needs more memory');
+    await page.getByTestId('drawer-close').click();
+    await page.unroute('**/api/proxy?*');
+    await page.route('**/api/proxy?*', route => route.fulfill({ contentType: 'text/html', body: '<div></div>' })); // a cloud model has no downloadable versions
+    await page.goto('/?model=gpt-oss-cloud');
+    await expect(page.getByTestId('drawer-fit')).toContainText("Ollama's servers");
+  });
+
+  test('compare can be changed from the details', async ({ page }) => {
+    await page.goto('/?model=llava');
+    await page.getByTestId('drawer-compare').click();
+    await expect(page.getByTestId('drawer-compare')).toContainText('Remove from compare');
+    await page.keyboard.press('Escape');
+    await expect(page.getByTestId('compare-count')).toHaveText('1');
+  });
+
+  test('the compare table shows speed too', async ({ page }) => {
+    await page.goto('/?compare=tinyllama,qwen2.5-coder');
+    await page.getByTestId('open-compare').click();
+    await expect(page.getByTestId('compare-dialog')).toContainText('Speed here');
+    await expect(page.getByTestId('compare-dialog').getByTestId('speed')).toHaveCount(2);
+  });
+
+  test('clicking the checkbox, publisher or link does not open the details', async ({ page }) => {
+    await page.goto('/');
+    await row(page, 'llava').getByTestId('compare-check').check();
+    await expect(page.getByTestId('model-drawer')).toHaveCount(0);
+    await row(page, 'bob/huge-70b').getByRole('button', { name: 'bob/' }).click();
+    await expect(page.getByTestId('model-drawer')).toHaveCount(0);
+  });
 });

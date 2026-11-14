@@ -40,3 +40,15 @@ test('RSS feed lists new and updated models', async ({ request }) => {
   expect((xml.match(/<item>/g) || []).length).toBe((xml.match(/<\/item>/g) || []).length);
   expect(xml).not.toMatch(/<description>[^<]*&(?!amp;|lt;|gt;|quot;)/); // everything is escaped
 });
+
+test('JSON API: estimated speed for a computer you describe', async ({ request }) => {
+  const res = await (await request.get('/api/v1/models?scope=official&q=llama3.2&memory_gb=24&bandwidth_gbs=1000&limit=1')).json();
+  expect(res.models[0].fit).toBe('good');
+  expect(res.models[0].tokens_per_second).toBeGreaterThan(50);
+  expect(res.models[0].best_version).toBeTruthy();
+  const fast = await (await request.get('/api/v1/models?scope=official&memory_gb=24&bandwidth_gbs=100&min_tps=30&sort=speed&limit=50')).json();
+  expect(fast.count).toBeGreaterThan(0);
+  const speeds = fast.models.map((m: any) => m.tokens_per_second);
+  expect(speeds.every((s: number) => s >= 30)).toBe(true);
+  expect([...speeds].sort((a, b) => b - a)).toEqual(speeds); // fastest first
+});

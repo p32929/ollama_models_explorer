@@ -5,7 +5,7 @@ import { daysSince, parseContext, parseSize } from './units.ts';
 
 export type Scope = 'all' | 'official' | 'community';
 export type View = 'browse' | 'new' | 'trending';
-export type SortField = 'auto' | 'name' | 'versions' | 'size' | 'context' | 'downloads' | 'updated';
+export type SortField = 'auto' | 'name' | 'versions' | 'size' | 'context' | 'downloads' | 'updated' | 'speed';
 export type SortDirection = 'asc' | 'desc';
 
 export interface Filters {
@@ -30,11 +30,13 @@ export interface Filters {
   dedupe: boolean;
   /** Only models that run on this computer */
   fitOnly: boolean;
+  /** Only models that write at least this many tokens per second on this computer (0 = any) */
+  minTps: number;
 }
 
 export const DEFAULT_FILTERS: Filters = {
   q: '', scope: 'all', view: 'browse', caps: [], tasks: [], sort: 'auto', dir: 'desc',
-  updatedDays: 0, maxGB: 0, minContextK: 0, owner: '', dedupe: false, fitOnly: false,
+  updatedDays: 0, maxGB: 0, minContextK: 0, owner: '', dedupe: false, fitOnly: false, minTps: 0,
 };
 
 export const ownerOf = (m: ModelData) => (m.name.includes('/') ? m.name.split('/')[0] : '');
@@ -44,7 +46,7 @@ const minSizeGB = (m: ModelData) => { const v = variantsOf(m); return v.length ?
 
 /** Which filters are active (not counting the search box, scope and view, which have their own controls) */
 export function activeFilterCount(f: Filters): number {
-  return [f.caps.length, f.tasks.length, f.updatedDays, f.maxGB, f.minContextK, f.owner, f.dedupe, f.fitOnly].filter(Boolean).length;
+  return [f.caps.length, f.tasks.length, f.updatedDays, f.maxGB, f.minContextK, f.owner, f.dedupe, f.fitOnly, f.minTps].filter(Boolean).length;
 }
 
 export const isNewModel = (m: ModelData, now = Date.now()) => daysSince(m.firstSeen, now) <= 30 || daysSince(m.updated, now) <= 14;
@@ -62,7 +64,12 @@ export interface Result {
   hiddenDuplicates: number;
 }
 
-export function applyFilters(all: ModelData[], f: Filters, memoryGB: number, now = Date.now(), liveNames?: Set<string>): Result {
+/** What the visitor's computer can do. A bare number means "this much memory, speed unknown". */
+export type Machine = number | { memoryGB: number; bandwidthGBs?: number };
+
+export function applyFilters(all: ModelData[], f: Filters, machine: Machine, now = Date.now(), liveNames?: Set<string>): Result {
+  const memoryGB = typeof machine === 'number' ? machine : machine.memoryGB;
+  const bandwidth = typeof machine === 'number' ? 0 : machine.bandwidthGBs || 0;
   const words = f.q.toLowerCase().split(/\s+/).filter(Boolean);
   const tasks = f.tasks.map(id => TASK_BY_ID[id]).filter(Boolean);
   const owner = f.owner.toLowerCase();
@@ -79,6 +86,7 @@ export function applyFilters(all: ModelData[], f: Filters, memoryGB: number, now
     if (f.maxGB) { const s = minSizeGB(m); if (!s || s > f.maxGB) return false; }
     if (f.minContextK && maxContextK(m) < f.minContextK) return false;
     if (f.fitOnly) { const s = fitOf(m, memoryGB).status; if (s !== 'good' && s !== 'tight') return false; }
+    if (f.minTps && bandwidth) { const x = fitOf(m, memoryGB, bandwidth); if ((x.status !== 'good' && x.status !== 'tight') || x.tps < f.minTps) return false; }
     if (words.length && !(liveNames?.has(m.name))) {
       const hay = `${m.name} ${m.description} ${m.capabilities.join(' ')}`.toLowerCase();
       if (!words.every(w => hay.includes(w))) return false;
@@ -115,6 +123,7 @@ export function applyFilters(all: ModelData[], f: Filters, memoryGB: number, now
       case 'size': return minSizeGB(m);
       case 'context': return maxContextK(m);
       case 'updated': return m.updated || '';
+      case 'speed': { const x = fitOf(m, memoryGB, bandwidth); return x.status === 'good' || x.status === 'tight' ? x.tps : -1; }
       default: return m.pullsCount || 0;
     }
   };

@@ -3,11 +3,11 @@ import { DEFAULT_FILTERS, type Filters, type Scope, type SortField, type View } 
 // Search, filters, sorting and the compare list live in the address, so any view can be shared as a link.
 const SCOPES: Scope[] = ['all', 'official', 'community'];
 const VIEWS: View[] = ['browse', 'new', 'trending'];
-const SORTS: SortField[] = ['auto', 'name', 'versions', 'size', 'context', 'downloads', 'updated'];
+const SORTS: SortField[] = ['auto', 'name', 'versions', 'size', 'context', 'downloads', 'updated', 'speed'];
 const list = (v: string | null) => (v || '').split(',').map(s => s.trim().toLowerCase()).filter(Boolean);
 const num = (v: string | null) => { const n = Number(v); return Number.isFinite(n) && n > 0 ? n : 0; };
 
-export function filtersToQuery(f: Filters, compare: string[] = []): string {
+export function filtersToQuery(f: Filters, compare: string[] = [], model = ''): string {
   const p = new URLSearchParams();
   if (f.q.trim()) p.set('q', f.q.trim());
   if (f.scope !== 'all') p.set('scope', f.scope);
@@ -21,12 +21,14 @@ export function filtersToQuery(f: Filters, compare: string[] = []): string {
   if (f.owner) p.set('by', f.owner);
   if (f.dedupe) p.set('dedupe', '1');
   if (f.fitOnly) p.set('fit', '1');
+  if (f.minTps) p.set('tps', String(f.minTps));
   if (compare.length) p.set('compare', compare.join(','));
+  if (model) p.set('model', model);
   const s = p.toString();
   return s ? `?${s}` : '';
 }
 
-export function queryToFilters(search: string): { filters: Filters; compare: string[] } {
+export function queryToFilters(search: string): { filters: Filters; compare: string[]; model: string } {
   const p = new URLSearchParams(search);
   const pick = <T extends string>(v: string | null, allowed: T[], fallback: T): T => (allowed.includes(v as T) ? (v as T) : fallback);
   const filters: Filters = {
@@ -44,7 +46,8 @@ export function queryToFilters(search: string): { filters: Filters; compare: str
     owner: p.get('by') || '',
     dedupe: p.get('dedupe') === '1',
     fitOnly: p.get('fit') === '1',
+    minTps: num(p.get('tps')),
   };
   const compare = (p.get('compare') || '').split(',').map(s => s.trim()).filter(Boolean).slice(0, 4);
-  return { filters, compare };
+  return { filters, compare, model: p.get('model') || '' };
 }
