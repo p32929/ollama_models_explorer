@@ -128,7 +128,7 @@ export async function fetchModelDetails(modelPath: string): Promise<ModelVersion
     });
     return Object.values(byName);
   } catch (error) {
-    console.error(`Error fetching model details from ${modelPath}:`, error);
+    // A model that is gone or cannot be reached just has no list of versions; the details panel says so.
     return [];
   }
 }

@@ -78,6 +78,7 @@ export function ModelDrawer({ model, device, loadVersions, relativeTime, onClose
   const recommended = useMemo(() => representatives(allVariants), [allVariants]);
   const [showAll, setShowAll] = useState(false);
   const variants = showAll ? allVariants : recommended;
+  const pending = loading && !model.versions.length; // the real list of versions is on its way
   const owner = ownerOf(model);
   const ctx = maxContextK(withVersions);
   const exact = Boolean(loaded?.length);
@@ -110,6 +111,9 @@ export function ModelDrawer({ model, device, loadVersions, relativeTime, onClose
           {/* On your computer */}
           <section className="rounded-xl border border-zinc-800 bg-zinc-900 p-4" data-testid="drawer-fit">
             <div className="mb-2 text-xs font-medium uppercase tracking-wide text-zinc-500">On {device?.label || 'your computer'}</div>
+            {pending && fit.status === 'unknown' ? (
+              <div className="space-y-2" aria-busy="true" aria-label="Loading"><div className="shimmer h-7 w-48 rounded-md" /><div className="shimmer h-4 w-3/4 rounded" /></div>
+            ) : (<>
             <div className="flex flex-wrap items-center gap-3">
               <FitBadge fit={fit} machine={machine} />
               {fit.tps > 0 && <SpeedBadge tps={fit.tps} showTier fit={fit} machine={machine} />}
@@ -124,6 +128,7 @@ export function ModelDrawer({ model, device, loadVersions, relativeTime, onClose
             {fit.status === 'cloud' && <p className="mt-2 text-sm text-zinc-400">This model runs on Ollama&apos;s servers, so your computer&apos;s memory does not matter.</p>}
             {fit.status === 'unknown' && !loading && <p className="mt-2 text-sm text-zinc-400">No size is listed for this model, so we cannot tell.</p>}
             {fit.status === 'tight' && <p className="mt-2 text-sm text-zinc-400">It fits, but with little memory to spare, so long chats may slow down.</p>}
+            </>)}
           </section>
 
           {/* Install */}
@@ -175,6 +180,11 @@ export function ModelDrawer({ model, device, loadVersions, relativeTime, onClose
               <h3 className="text-sm font-medium text-zinc-200">{showAll ? 'All versions' : 'One version per size'}, with speed on your computer</h3>
               {loading && <span className="inline-flex items-center gap-1.5 text-xs text-zinc-500"><Loader2 className="h-3.5 w-3.5 animate-spin" />Loading all versions…</span>}
             </div>
+            {pending && variants.length === 0 && (
+              <div className="space-y-2" aria-busy="true" aria-label="Loading versions" data-testid="versions-loading">
+                {[0, 1, 2, 3].map(i => <div key={i} className="shimmer h-11 rounded-lg" />)}
+              </div>
+            )}
             {variants.length === 0 && !loading && <p className="text-sm text-zinc-500">The list of versions could not be loaded. <a className="text-blue-400 underline" href={`${model.url}/tags`} target="_blank" rel="noopener noreferrer">See them on ollama.com</a>.</p>}
             {variants.length > 0 && (
               <div className="overflow-hidden rounded-lg border border-zinc-800" data-testid="variants">

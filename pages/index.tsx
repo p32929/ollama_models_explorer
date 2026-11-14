@@ -621,6 +621,7 @@ export default function Home() {
 
       {openModel && (
         <ModelDrawer
+          key={openModel.name}
           model={openModel}
           device={device}
           loadVersions={loadVersions}

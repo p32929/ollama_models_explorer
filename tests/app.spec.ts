@@ -412,7 +412,7 @@ test.describe('model details', () => {
   });
 
   test('model without a good fit explains why, and cloud models say so', async ({ page }) => {
-    await page.goto('/?model=bob/huge-70b');
+    await page.goto('/?model=gpt-oss-cloud');
     await expect(page.getByTestId('drawer-fit')).toContainText('needs more memory');
     await page.getByTestId('drawer-close').click();
     await page.unroute('**/api/proxy?*');
@@ -467,6 +467,28 @@ test('the search box stays in the same place on every tab', async ({ page }) => 
   }
   await choose(page, 'tasks', 'coding');
   expect(await left()).toBe(first);
+});
+
+test.describe('details panel while loading', () => {
+  test('shows a shimmer while versions load, and never the previous model\'s versions', async ({ page }) => {
+    const errors: string[] = [];
+    page.on('console', m => m.type() === 'error' && !/Failed to load resource/.test(m.text()) && errors.push(m.text()));
+    page.on('pageerror', e => errors.push(String(e)));
+    await page.route('**/api/proxy?*', async route => {
+      const url = decodeURIComponent(route.request().url());
+      await new Promise(r => setTimeout(r, 700));
+      if (url.includes('/llava/')) return route.fulfill({ contentType: 'text/html', body: tagsHtml([['llava:7b', '4.7GB', '32K']]) });
+      return route.fulfill({ status: 404, contentType: 'application/json', body: '{"error":"gone"}' });
+    });
+    await page.goto('/?model=gpt-oss-cloud');
+    const drawer = page.getByTestId('model-drawer');
+    await expect(drawer).toBeVisible();
+    await expect(drawer.getByTestId('versions-loading')).toBeVisible();
+    await expect(drawer).toContainText('could not be loaded'); // a model that is gone: a plain message, no error
+    await page.goto('/?model=llava');
+    await expect(drawer.getByTestId('variant-row')).toHaveCount(1);
+    expect(errors).toEqual([]);
+  });
 });
 
 test.describe('tooltips', () => {

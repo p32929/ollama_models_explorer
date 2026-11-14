@@ -40,7 +40,8 @@ export default async function handler(
     const response = await fetch(url, { headers, redirect: 'manual' });
 
     if (response.status >= 300 && response.status < 400) {
-      throw new Error(`Unexpected redirect (HTTP ${response.status}) from ${url}`);
+      // ollama.com redirects pages that do not exist (or moved) instead of answering 404
+      throw new Error(`HTTP 404: no such page (ollama.com redirected ${url})`);
     }
 
     if (!response.ok) {
@@ -60,7 +61,8 @@ export default async function handler(
     
   } catch (error: any) {
     console.error(`❌ [PROXY] Failed to fetch ${url}:`, error);
-    res.status(500).json({ 
+    const upstream = /^HTTP (\d{3})/.exec(error?.message || '');
+    res.status(upstream ? Number(upstream[1]) : 500).json({ 
       error: 'Failed to fetch URL',
       details: error.message 
     });
