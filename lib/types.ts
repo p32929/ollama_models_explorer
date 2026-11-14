@@ -23,10 +23,15 @@ export interface ModelData {
   tagsCount?: number;
   /** Parameter sizes shown on the search page, e.g. "7b", "70b" */
   sizes?: string[];
+  /** Date (YYYY-MM-DD) the crawler first saw this model; empty for models that were already there at the first crawl */
+  firstSeen?: string;
+  /** Downloads gained since the previous snapshot, and that snapshot's date */
+  growth?: number;
+  growthSince?: string;
 }
 
-/** One row of public/ollama-catalogue.json: [path, description, capabilities, downloads, tags, sizes, updated] */
-export type CatalogueRow = [string, string, string[], number, number, string[], string];
+/** One row of public/ollama-catalogue.json: [path, description, capabilities, downloads, tags, sizes, updated, firstSeen, previousDownloads, previousDate] */
+export type CatalogueRow = [string, string, string[], number, number, string[], string, string?, number?, string?];
 
 export interface Catalogue {
   generatedAt: string;

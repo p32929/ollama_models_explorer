@@ -6,18 +6,22 @@
 // searching every letter and digit and following every "next page" covers the whole catalogue.
 //
 //   node scripts/crawl-catalogue.mjs              # full crawl (about 10 to 20 minutes)
-//   node scripts/crawl-catalogue.mjs --quick      # just a few queries, to try it out
+//   node scripts/crawl-catalogue.mjs --quick      # just a few queries, to try it out; writes to a temporary file
 //   CONCURRENCY=4 DELAY=300 node scripts/crawl-catalogue.mjs
 //
 // No dependencies. Needs Node 18+.
 import fs from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-const OUT = process.env.OUT || path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'public', 'ollama-catalogue.json');
+const QUICK = process.argv.includes('--quick');
+// A quick sample must never replace the real list, so it writes to a temporary file unless told otherwise
+const OUT = process.env.OUT || (QUICK
+  ? path.join(os.tmpdir(), 'ollama-catalogue-quick.json')
+  : path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'public', 'ollama-catalogue.json'));
 const CONCURRENCY = Number(process.env.CONCURRENCY || 4);
 const DELAY = Number(process.env.DELAY || 250); // ms between requests of one worker
-const QUICK = process.argv.includes('--quick');
 const UA = 'Mozilla/5.0 (compatible; OllamaExplorerCatalogue/1.0; +https://github.com/p32929/ollama_models_explorer)';
 
 const QUERIES = QUICK
@@ -85,7 +89,29 @@ async function crawlQuery(q) {
   console.log(`  "${q}": ${page} pages, ${found} new models (total ${all.size}, ${requests} requests)`);
 }
 
+// History: compare with the list we saved last time, so the site can show what is NEW and what is TRENDING.
+//   row[7] firstSeen: the day this model first appeared in our list ('' for the models that were there from the start)
+//   row[8], row[9]: downloads and date of an older snapshot, to work out how many downloads were gained since
+const MIN_SNAPSHOT_GAP_DAYS = 5; // a baseline is replaced only once it is at least this old, so a re-run does not wipe the growth
+function addHistory() {
+  let prev;
+  try { prev = JSON.parse(fs.readFileSync(OUT, 'utf8')); } catch { return; }
+  if (!prev?.models?.length || prev.partial) return;
+  const before = new Map(prev.models.map((r) => [r[0], r]));
+  const today = new Date().toISOString().slice(0, 10);
+  const prevDate = String(prev.generatedAt || '').slice(0, 10);
+  const gapDays = prevDate ? (Date.parse(today) - Date.parse(prevDate)) / 86400000 : 0;
+  for (const row of all.values()) {
+    const old = before.get(row[0]);
+    if (!old) { row[7] = today; continue; } // not in the last list: a new model
+    row[7] = old[7] || '';
+    if (old[8] && (gapDays < MIN_SNAPSHOT_GAP_DAYS || !prevDate)) { row[8] = old[8]; row[9] = old[9]; } // keep the older baseline
+    else { row[8] = old[3]; row[9] = prevDate; } // the last list becomes the baseline
+  }
+}
+
 function save(partial) {
+  if (!partial && !QUICK) addHistory();
   const rows = [...all.values()].sort((a, b) => b[3] - a[3]); // most downloaded first
   fs.writeFileSync(OUT, JSON.stringify({ generatedAt: new Date().toISOString(), count: rows.length, partial: Boolean(partial), models: rows }));
   console.log(`Saved ${rows.length} models to ${path.relative(process.cwd(), OUT)} (${(fs.statSync(OUT).size / 1048576).toFixed(1)} MB)`);

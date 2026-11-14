@@ -4,59 +4,61 @@ A modern, dark-themed UI for exploring and filtering Ollama AI models. This Next
 
 **Live:** https://ollama-models-explorer.vercel.app/
 
-<img width="3024" height="1714" alt="Image" src="https://github.com/user-attachments/assets/48895735-134b-4410-a52d-921fab587dc1" />
+![Ollama Models Explorer: coding models that run on a 32 GB laptop](docs/screenshots/desktop.png)
+
+<p align="center">
+  <img src="docs/screenshots/compare.png" width="49%" alt="Comparing three models side by side">
+  <img src="docs/screenshots/trending.png" width="49%" alt="The Trending view">
+</p>
+
+<p align="center">
+  <img src="docs/screenshots/phone.png" height="460" alt="On a phone: models are cards">
+  <img src="docs/screenshots/phone-computer.png" height="460" alt="Picking your computer with one tap">
+</p>
 
 ## Features
 
-- 🌑 **Dark-themed UI** - Clean, modern interface with a dark color scheme
-- 🔍 **Advanced Filtering** - Filter models by search terms or specific capabilities
-- 📊 **Sortable Table** - Sort models by name, versions, size, or context window
-- 💻 **Compact Layout** - Space-efficient design that maximizes content visibility
-- 📱 **Responsive Design** - Works on desktop and mobile devices
-- ⚡ **Fast Performance** - Built with Next.js for optimal loading speeds
+**Every model on Ollama.** The ~270 official models (with every version, size and context window) **and the 17,000+ community models** (`user/model-name`), in Official / Community / All tabs.
 
-## Filtering & Sorting
+**Will it run on my computer?** The page finds your graphics card (or Apple chip) and memory by itself, with nothing to type, and marks every model **Runs well / Tight fit / Too big / Cloud**. If the guess is wrong, one tap picks the closest computer. "Only show what runs on it" hides the rest. (Browsers hide exact specs, so it is an estimate: official models use their real download sizes, the rest are estimated from the parameter count.)
 
-### Search
-Use the search bar to filter models by:
-- Model name
-- Description text
-- Capability types
-- Size characteristics ("smallest", "largest")
-- Context window size ("largest context")
-- Version information ("latest")
+**Find the right one**
+- **Quick picks**: Coding, Small & fast, Images, Reasoning, Embeddings, Translation, Chat & roleplay, Math, Tool use
+- **Search** by any words in the name, description or capabilities; **Search ollama.com live** for anything newer than the saved list
+- **Filters**: updated recently, size, context window, publisher (click a name), hide near-duplicates, capabilities
+- **Sort** by downloads, last update, name, size, context window or versions
 
-### Capability Filters
-Quickly filter models by their capabilities using the filter buttons:
-- Chat
-- Vision
-- Embedding
-- And more...
+**Compare** up to four models side by side (size, context, downloads, whether each runs on your computer).
 
-### Sorting
-Sort the model table by clicking column headers:
-- Model name (alphabetical)
-- Number of versions
-- Model size
-- Context window size
+**What's new / Trending**: models added or updated in the last two weeks, and what is rising. Trending ranks by real download growth once the list has two weekly snapshots, and by downloads plus recent updates until then.
 
-## Every model on Ollama, not just the official ones
+**Made for phones**: models become cards, controls scroll sideways in one row, filters open as a bottom sheet, compare goes full screen, and every tap target is at least 36 px.
 
-The page lists **all** models on ollama.com: the ~270 official ones (with every version, size and context window) **and the 17,000+ community models** uploaded by other people (`user/model-name`).
+**Shareable links**: search, filters, sort and the compare list are saved in the address.
 
-- **Official / Community / All** tabs, search, capability filters, and sorting by downloads, updated date, size and context
-- The list is long, so rows load as you scroll
-- **Search ollama.com live** (shown under the search box) asks ollama.com directly, for anything newer than the saved list
-- **Refresh Data** re-reads the official models with all their versions
+**Light and dark mode**, and a **Model of the week**.
 
-ollama.com has no "list everything" page, so the full list is built by a small crawler and saved in `public/ollama-catalogue.json`:
+**For developers**
+- JSON API: `GET /api/v1/models?q=coder&scope=community&cap=tools&sort=downloads&limit=50` (also `owner`, `updated`, `max_gb`, `min_context_k`, `new=1`, `memory_gb=16` to get a `fit` for that much memory). CORS is open.
+- RSS feed of new and updated models: `/feed.xml`
+
+### Where the full list comes from
+
+ollama.com has no "list everything" page, so a small crawler builds `public/ollama-catalogue.json`:
 
 ```bash
 node scripts/crawl-catalogue.mjs           # about 20 minutes, no dependencies
-node scripts/crawl-catalogue.mjs --quick   # a 1-minute sample, to try it
+node scripts/crawl-catalogue.mjs --quick   # a 1-minute sample (written to a temporary file)
 ```
 
-A GitHub Action (`.github/workflows/update-catalogue.yml`) runs it every week and commits the new list.
+Each run compares with the previous list to record when a model first appeared and how many downloads it gained. A GitHub Action (`.github/workflows/update-catalogue.yml`) runs it every week and commits the new list.
+
+### Tests
+
+```bash
+yarn test         # the logic: fit, device detection, filters, links (Node 22.6+)
+yarn test:e2e     # browser tests on desktop and phone sizes, plus the API (uses your installed Chrome)
+```
 
 ## Getting Started
 

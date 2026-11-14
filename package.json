@@ -6,7 +6,10 @@
     "dev": "next dev --turbopack -p 4000",
     "build": "next build",
     "start": "next start -p 4000",
-    "lint": "next lint"
+    "lint": "next lint",
+    "test": "node --experimental-strip-types --no-warnings --test lib/logic.test.mjs",
+    "test:e2e": "playwright test",
+    "crawl": "node scripts/crawl-catalogue.mjs"
   },
   "dependencies": {
     "@radix-ui/react-slot": "^1.2.3",
@@ -19,6 +22,7 @@
     "tailwind-merge": "^3.3.1"
   },
   "devDependencies": {
+    "@playwright/test": "^1.65.1",
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20",
     "@types/react": "^19",

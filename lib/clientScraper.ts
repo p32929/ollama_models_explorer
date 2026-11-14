@@ -1,4 +1,5 @@
 import { ModelData, ModelVersion } from './types';
+import { formatCount } from './units';
 
 // Rate limiting utility for client-side requests
 const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
@@ -27,8 +28,6 @@ const isSizeBadge = (badge: Element) =>
   classOf(badge).includes('text-blue-600') ||
   /^e?\d+(\.\d+)?(x\d+(\.\d+)?)?[bm]$/i.test(badge.textContent?.trim() || '');
 
-const formatCount = (n: number) =>
-  n >= 1e9 ? `${(n / 1e9).toFixed(1)}B` : n >= 1e6 ? `${(n / 1e6).toFixed(1)}M` : n >= 1e3 ? `${(n / 1e3).toFixed(1)}K` : String(n);
 
 export function parseModelListItem(li: Element): ModelData | null {
   const link = li.querySelector('a[href^="/library/"]') || li.querySelector('a[href^="/"]');

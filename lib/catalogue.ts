@@ -1,10 +1,9 @@
-import { Catalogue, CatalogueRow, ModelData } from './types';
+import type { Catalogue, CatalogueRow, ModelData } from './types';
 
-const formatCount = (n: number) =>
-  n >= 1e9 ? `${(n / 1e9).toFixed(1)}B` : n >= 1e6 ? `${(n / 1e6).toFixed(1)}M` : n >= 1e3 ? `${(n / 1e3).toFixed(1)}K` : String(n);
+import { formatCount } from './units.ts';
 
 /** Turns a compact catalogue row into the shape the table uses. Official models have no "/" in their name. */
-export function rowToModel([path, description, capabilities, pullsCount, tagsCount, sizes, updated]: CatalogueRow): ModelData {
+export function rowToModel([path, description, capabilities, pullsCount, tagsCount, sizes, updated, firstSeen, prevPulls, prevDate]: CatalogueRow): ModelData {
   const community = path.includes('/');
   return {
     name: path,
@@ -19,6 +18,9 @@ export function rowToModel([path, description, capabilities, pullsCount, tagsCou
     pullsCount,
     tagsCount,
     sizes,
+    firstSeen: firstSeen || '',
+    growth: prevPulls ? Math.max(0, pullsCount - prevPulls) : undefined,
+    growthSince: prevDate || undefined,
   };
 }
 
