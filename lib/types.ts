@@ -17,6 +17,22 @@ export interface ModelData {
   tags: string;
   updated: string;
   versions: ModelVersion[];
+  /** Set for models that come from the full catalogue (or a live search) rather than the detailed official scrape */
+  community?: boolean;
+  pullsCount?: number;
+  tagsCount?: number;
+  /** Parameter sizes shown on the search page, e.g. "7b", "70b" */
+  sizes?: string[];
+}
+
+/** One row of public/ollama-catalogue.json: [path, description, capabilities, downloads, tags, sizes, updated] */
+export type CatalogueRow = [string, string, string[], number, number, string[], string];
+
+export interface Catalogue {
+  generatedAt: string;
+  count: number;
+  partial?: boolean;
+  models: CatalogueRow[];
 }
 
 export interface ScrapingLog {

@@ -27,48 +27,51 @@ const isSizeBadge = (badge: Element) =>
   classOf(badge).includes('text-blue-600') ||
   /^e?\d+(\.\d+)?(x\d+(\.\d+)?)?[bm]$/i.test(badge.textContent?.trim() || '');
 
-function parseModelListItem(li: Element): ModelData | null {
-  const link = li.querySelector('a[href^="/library/"]');
+const formatCount = (n: number) =>
+  n >= 1e9 ? `${(n / 1e9).toFixed(1)}B` : n >= 1e6 ? `${(n / 1e6).toFixed(1)}M` : n >= 1e3 ? `${(n / 1e3).toFixed(1)}K` : String(n);
+
+export function parseModelListItem(li: Element): ModelData | null {
+  const link = li.querySelector('a[href^="/library/"]') || li.querySelector('a[href^="/"]');
   const href = link?.getAttribute('href');
-  if (!href) return null;
+  if (!href || href.startsWith('/search') || href.startsWith('/public')) return null;
+  const path = href.replace(/^\/library\//, '').replace(/^\//, '');
 
   const heading = li.querySelector('h2');
-  const name = heading?.textContent?.trim() || href.replace('/library/', '');
-  const description = heading?.parentElement?.querySelector('p')?.textContent?.trim() || '';
+  if (!heading) return null; // page menus and footers are <li> too; only model cards have a heading
+  const name = heading.textContent?.trim() || path;
+  const description = li.querySelector('p')?.textContent?.replace(/\s+/g, ' ').trim() || '';
 
   const capabilities: string[] = [];
+  const sizes: string[] = [];
   li.querySelectorAll('span.rounded-md').forEach(badge => {
     const text = badge.textContent?.trim();
-    if (text && !isSizeBadge(badge)) capabilities.push(text);
+    if (!text) return;
+    if (isSizeBadge(badge)) sizes.push(text);
+    else capabilities.push(text);
   });
 
-  // Stats row: pulls, tags and updated time, each a span holding a CSS-hidden
-  // label ("&nbsp;Pulls", "Updated&nbsp;") plus the visible value.
-  let pulls = '';
-  let tags = '';
-  let updated = '';
-
-  const statsRow = li.querySelector('p.space-x-5');
-  statsRow?.querySelectorAll(':scope > span').forEach(stat => {
-    const spans = Array.from(stat.querySelectorAll('span'));
-    const label = spans.map(s => s.textContent || '').join(' ');
-    const value = (spans.find(s => !classOf(s).includes('hidden')) || spans[0])
-      ?.textContent?.trim() || '';
-
-    if (/pull/i.test(label)) pulls = value;
-    else if (/tag/i.test(label)) tags = value;
-    else if (/updated/i.test(label)) updated = value;
-  });
+  // Stats: downloads and updated date live in title attributes, the tag count is plain text.
+  const downloadsTitle = li.querySelector('[title$=" downloads"]')?.getAttribute('title') || '';
+  const pullsCount = Number(downloadsTitle.replace(/[^0-9]/g, '')) || 0;
+  const tagsMatch = /(\d+)\s+tags?/i.exec(li.textContent || '');
+  const tagsCount = tagsMatch ? Number(tagsMatch[1]) : 0;
+  const updatedTitle = li.querySelector('[title^="Updated "]')?.getAttribute('title')?.replace(/^Updated /, '') || '';
+  const parsed = updatedTitle ? new Date(`${updatedTitle} UTC`) : null;
+  const updated = parsed && !Number.isNaN(parsed.getTime()) ? parsed.toISOString().slice(0, 10) : '';
 
   return {
     name,
-    url: `https://ollama.com${href}`,
+    url: `https://ollama.com/${href.startsWith('/library/') ? href.slice(1) : path}`,
     description,
     capabilities,
-    pulls,
-    tags,
+    pulls: pullsCount ? formatCount(pullsCount) : '',
+    tags: tagsCount ? String(tagsCount) : '',
     updated,
-    versions: []
+    versions: [],
+    community: path.includes('/'),
+    pullsCount,
+    tagsCount,
+    sizes
   };
 }
 
@@ -123,6 +126,31 @@ async function fetchModelDetails(modelPath: string): Promise<ModelVersion[]> {
     console.error(`Error fetching model details from ${modelPath}:`, error);
     return [];
   }
+}
+
+/**
+ * Live search on ollama.com (official and community models). Used for anything newer than the saved catalogue.
+ * Follows "next page" up to maxPages and returns lightweight entries (no per-version details).
+ */
+export async function searchOllama(
+  query: string,
+  maxPages = 10,
+  onProgress?: (message: string) => void
+): Promise<ModelData[]> {
+  const found: ModelData[] = [];
+  let nextPath: string | null = `/search?q=${encodeURIComponent(query)}`;
+  for (let page = 1; nextPath && page <= maxPages; page++) {
+    onProgress?.(`Searching ollama.com for “${query}” (page ${page})…`);
+    const doc: Document = await fetchViaProxy(nextPath, page > 1);
+    let onPage = 0;
+    doc.querySelectorAll('li').forEach(li => {
+      const model = parseModelListItem(li);
+      if (model) { found.push(model); onPage++; }
+    });
+    if (!onPage) break;
+    nextPath = doc.querySelector('li[hx-get^="/search"]')?.getAttribute('hx-get') || null;
+  }
+  return found;
 }
 
 export async function scrapeOllamaModels(

@@ -40,6 +40,24 @@ Sort the model table by clicking column headers:
 - Model size
 - Context window size
 
+## Every model on Ollama, not just the official ones
+
+The page lists **all** models on ollama.com: the ~270 official ones (with every version, size and context window) **and the 17,000+ community models** uploaded by other people (`user/model-name`).
+
+- **Official / Community / All** tabs, search, capability filters, and sorting by downloads, updated date, size and context
+- The list is long, so rows load as you scroll
+- **Search ollama.com live** (shown under the search box) asks ollama.com directly, for anything newer than the saved list
+- **Refresh Data** re-reads the official models with all their versions
+
+ollama.com has no "list everything" page, so the full list is built by a small crawler and saved in `public/ollama-catalogue.json`:
+
+```bash
+node scripts/crawl-catalogue.mjs           # about 20 minutes, no dependencies
+node scripts/crawl-catalogue.mjs --quick   # a 1-minute sample, to try it
+```
+
+A GitHub Action (`.github/workflows/update-catalogue.yml`) runs it every week and commits the new list.
+
 ## Getting Started
 
 ```bash
@@ -57,7 +75,7 @@ Open [http://localhost:3000](http://localhost:3000) with your browser to see the
 
 ## Data Source
 
-The application loads model data from a local JSON file located at `/public/ollama.json`. The data structure includes:
+The official models are read live from ollama.com. The complete list (official and community) comes from `/public/ollama-catalogue.json`. The data includes:
 
 - Model name and description
 - Capabilities (chat, vision, etc.)

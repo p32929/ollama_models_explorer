@@ -25,9 +25,13 @@ import {
 } from 'lucide-react';
 
 import { ModelData, ModelVersion, ApiResponse, ScrapingLog } from '@/lib/types';
-import { scrapeOllamaModels } from '@/lib/clientScraper';
+import { scrapeOllamaModels, searchOllama } from '@/lib/clientScraper';
+import { loadCatalogue } from '@/lib/catalogue';
 
-type SortField = 'name' | 'capabilities' | 'versions' | 'size' | 'context';
+type SortField = 'name' | 'capabilities' | 'versions' | 'size' | 'context' | 'downloads' | 'updated';
+type Scope = 'all' | 'official' | 'community';
+
+const PAGE_SIZE = 150; // rows drawn at a time: the full catalogue is tens of thousands of models
 type SortDirection = 'asc' | 'desc';
 
 // Mapping capabilities to their appropriate icons
@@ -50,8 +54,17 @@ export default function Home() {
   const [logs, setLogs] = useState<ScrapingLog[]>([]);
   const [progress, setProgress] = useState<{current: number; total: number; currentTask: string} | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
-  const [sortField, setSortField] = useState<SortField>('name');
-  const [sortDirection, setSortDirection] = useState<SortDirection>('asc');
+  const [sortField, setSortField] = useState<SortField>('downloads');
+  const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
+  const [catalogue, setCatalogue] = useState<ModelData[]>([]);
+  const [catalogueDate, setCatalogueDate] = useState<string | null>(null);
+  const [scope, setScope] = useState<Scope>('all');
+  const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
+  const [liveResults, setLiveResults] = useState<ModelData[]>([]);
+  const [liveHits, setLiveHits] = useState<Record<string, string[]>>({}); // search text -> names ollama.com returned
+  const [liveSearching, setLiveSearching] = useState<string | null>(null);
+  const [liveMessage, setLiveMessage] = useState<string | null>(null);
+  const [sentinel, setSentinel] = useState<HTMLDivElement | null>(null); // end-of-list marker; state (not a ref) so the observer is set up when it appears
   const [activeCapabilityFilter, setActiveCapabilityFilter] = useState<string | null>(null);
 
   // Data fetching function
@@ -156,17 +169,74 @@ export default function Home() {
 
   // Initial data fetching
   useEffect(() => {
-    fetchModels().finally(() => setInitialLoading(false));
+    Promise.all([
+      fetchModels(),
+      loadCatalogue().then(result => {
+        if (result) {
+          setCatalogue(result.models);
+          setCatalogueDate(result.generatedAt);
+        }
+      }),
+    ]).finally(() => setInitialLoading(false));
   }, []);
+
+  // Every model we know about: the detailed official ones (versions, size, context) first, then the rest of
+  // the catalogue, then anything found by a live search that is newer than the catalogue.
+  const allModels = useMemo(() => {
+    const byName = new Map<string, ModelData>();
+    const add = (m: ModelData) => {
+      const existing = byName.get(m.name);
+      if (!existing) { byName.set(m.name, m); return; }
+      // keep the detailed record, but fill gaps (downloads, tag count, dates) from the other one
+      byName.set(m.name, {
+        ...m,
+        ...existing,
+        description: existing.description || m.description,
+        pullsCount: existing.pullsCount || m.pullsCount,
+        pulls: existing.pulls || m.pulls,
+        tagsCount: existing.tagsCount || m.tagsCount,
+        updated: existing.updated || m.updated,
+        sizes: existing.sizes?.length ? existing.sizes : m.sizes,
+        capabilities: existing.capabilities.length ? existing.capabilities : m.capabilities,
+      });
+    };
+    models.forEach(add);
+    catalogue.forEach(add);
+    liveResults.forEach(add);
+    return Array.from(byName.values());
+  }, [models, catalogue, liveResults]);
+
+  const officialCount = useMemo(() => allModels.filter(m => !m.community && !m.name.includes('/')).length, [allModels]);
+
+  // "Search ollama.com live" for anything newer than the saved catalogue
+  const runLiveSearch = async () => {
+    const q = searchTerm.trim();
+    if (q.length < 2 || liveSearching) return;
+    setLiveSearching(q);
+    setLiveMessage(null);
+    try {
+      const found = await searchOllama(q, 10, message => setLiveMessage(message));
+      setLiveResults(prev => {
+        const names = new Set(prev.map(m => m.name));
+        return [...prev, ...found.filter(m => !names.has(m.name))];
+      });
+      setLiveHits(prev => ({ ...prev, [q.toLowerCase()]: found.map(m => m.name) }));
+      setLiveMessage(`Live search found ${found.length} models for “${q}”.`);
+    } catch (error: any) {
+      setLiveMessage(`Live search failed: ${error.message}`);
+    } finally {
+      setLiveSearching(null);
+    }
+  };
 
   // Extract unique capabilities across all models for filtering
   const allCapabilities = useMemo(() => {
     const capabilities = new Set<string>();
-    models.forEach(model => {
+    allModels.forEach(model => {
       model.capabilities.forEach(cap => capabilities.add(cap.toLowerCase()));
     });
     return Array.from(capabilities).sort();
-  }, [models]);
+  }, [allModels]);
 
   // Sorting logic
   const handleSort = (field: SortField) => {
@@ -174,7 +244,7 @@ export default function Home() {
       setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
     } else {
       setSortField(field);
-      setSortDirection('asc');
+      setSortDirection(field === 'downloads' || field === 'updated' ? 'desc' : 'asc');
     }
   };
 
@@ -190,11 +260,15 @@ export default function Home() {
 
   // Size parser for consistent comparison
   const parseSize = (sizeStr: string): number => {
-    if (!sizeStr) return 0;
-    const num = parseFloat(sizeStr.replace(/[^0-9.]/g, ''));
-    if (sizeStr.toLowerCase().includes('tb')) return num * 1000;
-    if (sizeStr.toLowerCase().includes('kb')) return num / 1000;
-    return num; // Assume GB by default
+    const m = /([0-9]+(?:\.[0-9]+)?)\s*(tb|gb|mb|kb)/i.exec(sizeStr || ''); // first number with a unit: "23GB - 24GB" is 23 GB
+    if (!m) return 0; // "Low Usage" and similar are not a size
+    const num = parseFloat(m[1]);
+    switch (m[2].toLowerCase()) {
+      case 'tb': return num * 1000;
+      case 'gb': return num;
+      case 'mb': return num / 1000;
+      default: return num / 1000000;
+    }
   };
 
   // Context window parser for consistent comparison
@@ -209,7 +283,11 @@ export default function Home() {
   // Advanced filtering and sorting
   const filteredAndSortedModels = useMemo(() => {
     // Step 1: Filter by search term and capability filter
-    let filtered = models.filter((model: ModelData) => {
+    const liveSet = new Set(liveHits[searchTerm.trim().toLowerCase()] || []);
+    let filtered = allModels.filter((model: ModelData) => {
+      const isCommunity = model.name.includes('/');
+      if (scope === 'official' && isCommunity) return false;
+      if (scope === 'community' && !isCommunity) return false;
       const searchLower = searchTerm.toLowerCase();
       
       // Special search terms
@@ -234,8 +312,8 @@ export default function Home() {
       return (
         // Must pass capability filter if one is active
         passesCapabilityFilter && (
-          // Either matches basic fields
-          nameMatch || descMatch || capMatch ||
+          // Either matches basic fields (or ollama.com's own live search returned it for this text)
+          nameMatch || descMatch || capMatch || liveSet.has(model.name) ||
           // Or matches special semantic search terms
           (isSmallestSearch && hasVersions) ||
           (isLargestSearch && hasVersions) ||
@@ -269,6 +347,14 @@ export default function Home() {
           aValue = aSizes.length > 0 ? Math.min(...aSizes) : 0;
           bValue = bSizes.length > 0 ? Math.min(...bSizes) : 0;
           break;
+        case 'downloads':
+          aValue = a.pullsCount || 0;
+          bValue = b.pullsCount || 0;
+          break;
+        case 'updated':
+          aValue = a.updated || '';
+          bValue = b.updated || '';
+          break;
         case 'context':
           const aContexts = a.versions.map(v => parseContext(v.context)).filter(c => c > 0);
           const bContexts = b.versions.map(v => parseContext(v.context)).filter(c => c > 0);
@@ -284,10 +370,24 @@ export default function Home() {
       if (aValue > bValue) return sortDirection === 'asc' ? 1 : -1;
       return 0;
     });
-  }, [models, searchTerm, sortField, sortDirection, activeCapabilityFilter]);
+  }, [allModels, searchTerm, sortField, sortDirection, activeCapabilityFilter, scope, liveHits]);
+
+  // Show more rows as the user scrolls; start over whenever the list changes
+  useEffect(() => { setVisibleCount(PAGE_SIZE); }, [searchTerm, sortField, sortDirection, activeCapabilityFilter, scope]);
+  const visibleModels = useMemo(() => filteredAndSortedModels.slice(0, visibleCount), [filteredAndSortedModels, visibleCount]);
+  const hasMore = visibleCount < filteredAndSortedModels.length;
+  useEffect(() => {
+    if (!sentinel || !hasMore) return;
+    const observer = new IntersectionObserver(entries => {
+      if (entries.some(e => e.isIntersecting)) setVisibleCount(c => c + PAGE_SIZE);
+    }, { rootMargin: '600px' });
+    observer.observe(sentinel);
+    return () => observer.disconnect();
+  }, [sentinel, hasMore, visibleModels.length]);
 
   // Helper to get model size range for display
-  const getModelSizes = (versions: ModelVersion[]) => {
+  const getModelSizes = (versions: ModelVersion[], listed: string[] = []) => {
+    if (versions.length === 0) return listed.length === 0 ? 'N/A' : listed.length > 3 ? `${listed[0]} – ${listed[listed.length - 1]}` : listed.join(' · ');
     const sizes = versions.map(v => v.size).filter(s => s && s !== '');
     if (sizes.length === 0) return 'N/A';
     if (sizes.length === 1) return sizes[0];
@@ -326,9 +426,10 @@ export default function Home() {
     if (diffDays === 0) return 'Today';
     if (diffDays === 1) return 'Yesterday';
     if (diffDays < 7) return `${diffDays} days ago`;
-    if (diffDays < 30) return `${Math.floor(diffDays / 7)} weeks ago`;
-    if (diffDays < 365) return `${Math.floor(diffDays / 30)} months ago`;
-    return `${Math.floor(diffDays / 365)} years ago`;
+    const ago = (n: number, unit: string) => `${n} ${unit}${n === 1 ? '' : 's'} ago`;
+    if (diffDays < 30) return ago(Math.floor(diffDays / 7), 'week');
+    if (diffDays < 365) return ago(Math.floor(diffDays / 30), 'month');
+    return ago(Math.floor(diffDays / 365), 'year');
   };
 
   // Display proper icon for capability
@@ -514,10 +615,30 @@ export default function Home() {
                 className="pl-12 pr-24 h-9 text-sm bg-zinc-900 border-zinc-800 text-white rounded-md shadow-lg focus-visible:ring-1 focus-visible:ring-white focus-visible:border-transparent"
               />
               <div className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-zinc-500">
-                {filteredAndSortedModels.length} of {models.length}
+                {filteredAndSortedModels.length.toLocaleString()} of {allModels.length.toLocaleString()}
               </div>
             </div>
             
+            {/* Scope: official models, community uploads, or everything */}
+            <div className="flex items-center justify-center gap-1 mb-3" role="tablist" aria-label="Which models to show">
+              {([
+                ['all', 'All', allModels.length],
+                ['official', 'Official', officialCount],
+                ['community', 'Community', allModels.length - officialCount],
+              ] as [Scope, string, number][]).map(([value, label, count]) => (
+                <button
+                  key={value}
+                  role="tab"
+                  aria-selected={scope === value}
+                  data-testid={`scope-${value}`}
+                  onClick={() => setScope(value)}
+                  className={`px-3 h-7 rounded-md text-xs font-medium transition-colors ${scope === value ? 'bg-white text-black' : 'text-zinc-400 hover:text-white hover:bg-zinc-900'}`}
+                >
+                  {label} <span className={scope === value ? 'text-zinc-600' : 'text-zinc-500'}>{count.toLocaleString()}</span>
+                </button>
+              ))}
+            </div>
+
             {/* Capability filters */}
             <div className="flex flex-wrap items-center justify-center gap-1.5 mb-5">
               <Button
@@ -542,6 +663,21 @@ export default function Home() {
               ))}
             </div>
             
+            {/* Live search: the saved list can be a little behind ollama.com */}
+            {searchTerm.trim().length >= 2 && scope !== 'official' && (
+              <div className="text-center text-xs text-zinc-400 mb-3" data-testid="live-search">
+                <span>Can&apos;t find it? The saved list can be a few days old. </span>
+                <button
+                  onClick={runLiveSearch}
+                  disabled={liveSearching !== null}
+                  className="text-blue-400 hover:text-blue-300 underline underline-offset-2 disabled:opacity-60"
+                >
+                  {liveSearching ? 'Searching…' : `Search ollama.com live for “${searchTerm.trim()}”`}
+                </button>
+                {liveMessage && <div className="mt-1 text-zinc-500">{liveMessage}</div>}
+              </div>
+            )}
+
             {/* Filtered by indicator */}
             {activeCapabilityFilter && (
               <div className="text-center text-xs text-zinc-400 mb-3">
@@ -551,7 +687,7 @@ export default function Home() {
           </div>
 
           {/* Table */}
-          {models.length === 0 && !isPending && !refreshing ? (
+          {allModels.length === 0 && !isPending && !refreshing ? (
             // No models loaded yet - show load button
             <div className="text-center py-16 bg-zinc-900 rounded-lg border border-zinc-800 shadow-lg">
               <div className="inline-block rounded-full bg-zinc-800 p-5 mb-6 border border-zinc-700">
@@ -603,20 +739,38 @@ export default function Home() {
                           <span>Context</span> {getSortIcon('context')}
                         </div>
                       </TableHead>
+                      <TableHead
+                        className="cursor-pointer py-2.5 text-zinc-300 font-medium hover:text-white transition-colors hidden lg:table-cell"
+                        onClick={() => handleSort('downloads')}
+                      >
+                        <div className="flex items-center">
+                          <span>Downloads</span> {getSortIcon('downloads')}
+                        </div>
+                      </TableHead>
+                      <TableHead
+                        className="cursor-pointer py-2.5 text-zinc-300 font-medium hover:text-white transition-colors hidden 2xl:table-cell"
+                        onClick={() => handleSort('updated')}
+                      >
+                        <div className="flex items-center">
+                          <span>Updated</span> {getSortIcon('updated')}
+                        </div>
+                      </TableHead>
                       <TableHead className="text-right py-2.5 text-zinc-300 font-medium">
                         Link
                       </TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {filteredAndSortedModels.map((model, index) => (
+                    {visibleModels.map((model, index) => (
                       <TableRow 
                         key={index} 
                         className="border-zinc-800 hover:bg-zinc-800/50 transition-colors"
                       >
                         <TableCell className="py-2.5">
-                          <div className="font-medium text-white">
-                            {model.name}
+                          <div className="font-medium text-white" data-testid="model-name">
+                            {model.name.includes('/') ? (
+                              <><span className="text-zinc-500">{model.name.split('/')[0]}/</span>{model.name.split('/').slice(1).join('/')}</>
+                            ) : model.name}
                           </div>
                           <div className="text-sm text-zinc-400 mt-1 max-w-52 lg:max-w-md truncate">
                             {model.description}
@@ -649,7 +803,7 @@ export default function Home() {
                         <TableCell className="py-2.5 hidden sm:table-cell">
                           <div className="flex items-center gap-2">
                             <span className="font-mono text-white bg-zinc-800 px-2.5 py-0.5 rounded-md min-w-[2rem] text-center">
-                              {model.versions.length}
+                              {model.versions.length || model.tagsCount || 0}
                             </span>
                             {model.versions.some(v => v.isLatest) && (
                               <Badge className="bg-zinc-800 text-white border-zinc-700 flex items-center gap-1">
@@ -662,7 +816,7 @@ export default function Home() {
                         <TableCell className="py-2.5 hidden md:table-cell">
                           <div className="font-mono text-sm text-white bg-zinc-800 px-2.5 py-0.5 rounded-md inline-flex items-center gap-1.5">
                             <Tag className="h-3.5 w-3.5 text-zinc-400" />
-                            {getModelSizes(model.versions)}
+                            {getModelSizes(model.versions, model.sizes)}
                           </div>
                         </TableCell>
                         <TableCell className="py-2.5 hidden lg:table-cell">
@@ -670,6 +824,12 @@ export default function Home() {
                             <Gauge className="h-3.5 w-3.5 text-zinc-400" />
                             {getMaxContext(model.versions)}
                           </div>
+                        </TableCell>
+                        <TableCell className="py-2.5 hidden lg:table-cell text-sm text-zinc-300 tabular-nums" data-testid="downloads">
+                          {model.pulls || '—'}
+                        </TableCell>
+                        <TableCell className="py-2.5 hidden 2xl:table-cell text-sm text-zinc-400 whitespace-nowrap">
+                          {model.updated ? getRelativeTime(model.updated) : '—'}
                         </TableCell>
                         <TableCell className="py-2.5 text-right">
                           <Button
@@ -688,8 +848,13 @@ export default function Home() {
                   </TableBody>
                 </Table>
               </div>
+              {hasMore && (
+                <div ref={setSentinel} className="py-4 text-center text-xs text-zinc-500 border-t border-zinc-800">
+                  Showing {visibleModels.length.toLocaleString()} of {filteredAndSortedModels.length.toLocaleString()} · scroll for more
+                </div>
+              )}
             </div>
-          ) : models.length > 0 ? (
+          ) : allModels.length > 0 ? (
             // Models are loaded but none match search/filter
             <div className="text-center py-16 bg-zinc-900 rounded-lg border border-zinc-800 shadow-lg">
               <div className="inline-block rounded-full bg-zinc-800 p-5 mb-6 border border-zinc-700">
@@ -737,7 +902,7 @@ export default function Home() {
           
           {/* Footer */}
           <div className="mt-10 text-center text-sm text-zinc-600 space-y-2">
-            <p>Data served from in-memory cache • {models.length} models loaded</p>
+            <p>{allModels.length.toLocaleString()} models • {officialCount.toLocaleString()} official, {(allModels.length - officialCount).toLocaleString()} community{catalogueDate ? ` • list saved ${new Date(catalogueDate).toLocaleDateString()}` : ''}</p>
             {lastUpdated && (
               <p className="text-xs">
                 Last updated: {new Date(lastUpdated).toLocaleString()}
