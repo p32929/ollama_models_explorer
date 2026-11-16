@@ -73,13 +73,13 @@ Or deploy it to Vercel, Netlify or any Node host. If you like it, a star on GitH
 **Click any model** for a details panel (it shows a loading shimmer while the versions load): will it run and how fast, the exact `ollama run` command (with a copy button, including the best version for your computer), every version with its size and speed, context window, downloads and more.
 
 **Find the right one**
-- **I want to…** (pick several, a model must match all): Coding, Small & fast, Images, Reasoning, Embeddings, Translation, Chat & roleplay, Math, Tool use
-- **Capabilities** (also several): Tools, Vision, Thinking, Embedding, Audio, Cloud…
-- **Search** by any words in the name, description or capabilities; **Search ollama.com live** for anything newer than the saved list
-- **Filters**: updated recently, size, context window, publisher (click a name), hide near-duplicates, capabilities
-- **Sort** by downloads, last update, name, size, context window, versions or **speed on your computer**; **filter** by minimum speed (10, 20 or 40+ tokens/s)
-- **At a glance**: how many models can run on your computer, how many are fast, how many are new
-- **Always-open filter panel** on the left, so you can see and change every filter at once
+1. **I want to…** (pick several, a model must match all): Coding, Small & fast, Images, Reasoning, Embeddings, Translation, Chat & roleplay, Math, Tool use
+2. **Capabilities** (also several): Tools, Vision, Thinking, Embedding, Audio, Cloud…
+3. **Search** by any words in the name, description or capabilities; **Search ollama.com live** for anything newer than the saved list
+4. **Filters**: updated recently, size, context window, publisher (click a name), hide near-duplicates, capabilities
+5. **Sort** by downloads, last update, name, size, context window, versions or **speed on your computer**; **filter** by minimum speed (10, 20 or 40+ tokens/s)
+6. **At a glance**: how many models can run on your computer, how many are fast, how many are new
+7. **Always-open filter panel** on the left, so you can see and change every filter at once
 
 **Compare** up to four models side by side (size, context, downloads, whether each runs on your computer).
 
@@ -92,8 +92,8 @@ Or deploy it to Vercel, Netlify or any Node host. If you like it, a star on GitH
 **Light and dark mode**, and a **Model of the week**.
 
 **For developers**
-- JSON API: `GET /api/v1/models?q=coder&scope=community&cap=tools&sort=downloads&limit=50` (also `owner`, `updated`, `max_gb`, `min_context_k`, `new=1`, `memory_gb=16&bandwidth_gbs=200` to get a `fit` and an estimated `tokens_per_second` for that computer, `min_tps=20`, `sort=speed`). CORS is open.
-- RSS feed of new and updated models: `/feed.xml`
+1. JSON API: `GET /api/v1/models?q=coder&scope=community&cap=tools&sort=downloads&limit=50` (also `owner`, `updated`, `max_gb`, `min_context_k`, `new=1`, `memory_gb=16&bandwidth_gbs=200` to get a `fit` and an estimated `tokens_per_second` for that computer, `min_tps=20`, `sort=speed`). CORS is open.
+2. RSS feed of new and updated models: `/feed.xml`
 
 ### Where the full list comes from
 
@@ -121,75 +121,28 @@ See [Please self-host it](#please-self-host-it). `npm run dev` or `pnpm dev` wor
 
 The official models are read live from ollama.com. The complete list (official and community) comes from `/public/ollama-catalogue.json`. The data includes:
 
-- Model name and description
-- Capabilities (chat, vision, etc.)
-- Version information
-- Size and context window details
-- External links
+1. Model name and description
+2. Capabilities (chat, vision, etc.)
+3. Version information
+4. Size and context window details
+5. External links
 
-## Technologies
+## Built with
 
-- **Next.js**: React framework for production
-- **TypeScript**: Type-safe code
-- **Tailwind CSS**: Utility-first CSS framework
-- **shadcn/ui**: Component library for the UI elements
-- **Lucide React**: Icon library
+1. **Next.js**: React framework for production
+2. **TypeScript**: Type-safe code
+3. **Tailwind CSS**: Utility-first CSS framework
+4. **shadcn/ui**: Component library for the UI elements
+5. **Lucide React**: Icon library
 
 ## Contributing
 
-Contributions are warmly welcomed and greatly appreciated! Whether it's a bug fix, new feature, or improvement, your input helps make this project better for everyone.
-
-Before submitting a pull request, please:
-
-1. Create an issue describing the feature or bug fix you'd like to work on
-2. Wait for discussion and approval to ensure alignment with project goals
-3. Fork the repository and create your feature branch
-4. Submit your pull request with a clear description of changes
-
-This approach helps avoid duplicate efforts and ensures smooth collaboration. Thank you for considering contributing!
+Contributions are very welcome, thank you! Before you start on a pull request, please open an issue and tell me what you would like to add or change. That way we can agree on it first, and your time is not wasted on something that might not fit. Thanks for helping make Ollama Models Explorer better.
 
 ## Share
 
-Sharing this repository with your friends is just one click away from here
-
-[![facebook](https://user-images.githubusercontent.com/6418354/179013321-ac1d1452-0689-493f-9066-940cf2302b6e.png)](https://www.facebook.com/sharer/sharer.php?u=https://github.com/p32929/ollama_models_explorer/)
-[![twitter](https://user-images.githubusercontent.com/6418354/179013351-7d8d6d1c-4ce2-46ab-bef8-4c4765a1b888.png)](https://twitter.com/intent/tweet?url=https://github.com/p32929/ollama_models_explorer/)
-[![tumblr](https://user-images.githubusercontent.com/6418354/179013343-3111f55a-3b90-40c7-8487-9777348672b0.png)](https://www.tumblr.com/share?v=3&u=https://github.com/p32929/ollama_models_explorer/)
-[![pocket](https://user-images.githubusercontent.com/6418354/179013334-b095c45f-becf-49f4-9ee1-5a731a9b1f85.png)](https://getpocket.com/save?url=https://github.com/p32929/ollama_models_explorer/)
-[![pinterest](https://user-images.githubusercontent.com/6418354/179013331-44cd9206-11b1-4b65-becb-5863b61c828f.png)](https://pinterest.com/pin/create/button/?url=https://github.com/p32929/ollama_models_explorer/)
-[![reddit](https://user-images.githubusercontent.com/6418354/179013338-7416ae3f-73ba-4522-86e1-1374d7082d22.png)](https://www.reddit.com/submit?url=https://github.com/p32929/ollama_models_explorer/)
-[![linkedin](https://user-images.githubusercontent.com/6418354/179013327-ca7b7102-1da8-4b1c-858f-1a6e5f21bd70.png)](https://www.linkedin.com/shareArticle?mini=true&url=https://github.com/p32929/ollama_models_explorer/)
-[![whatsapp](https://user-images.githubusercontent.com/6418354/179013353-f477fa0b-3e6f-4138-a357-c9991b23ff88.png)](https://api.whatsapp.com/send?text=https://github.com/p32929/ollama_models_explorer/)
-
----
+<a href="https://p32929.github.io/share/?repo=ollama_models_explorer"><img src="https://p32929.github.io/readme/share.svg" alt="Share this with your friends in just a click" width="420"></a>
 
 ## Support
 
-If this saved you time, you can buy me a coffee — it keeps these projects maintained and free.
-
-[![Buy Me A Coffee](https://img.shields.io/badge/Buy%20me%20a%20coffee-%E2%98%95-FFDD00?style=for-the-badge&logo=buymeacoffee&logoColor=black)](https://www.buymeacoffee.com/p32929)
-
-<!-- hire-block -->
-
----
-
-## 💼 Using this at a company?
-
-I do fixed-price delivery work on my own projects. One invoice, one date, no hourly billing:
-
-| | |
-|---|---|
-| **White-label build** — this project rebranded, extended and deployed as yours | **$6,500** · 3 weeks |
-| **Custom app from scratch** on my own stack, signed and auto-updating | **$12,500** · 6 weeks |
-| **Production-hardening sprint** — 72 hours on this project, for your load and your security review | **$999** |
-| **Ongoing capacity** — one project-week of my time reserved every month | **$9,000 / month** |
-
-Full details → **[p32929.github.io/hire](https://p32929.github.io/hire/)** · Email **[fayazdevinbox@uberip.com](mailto:fayazdevinbox@uberip.com)** — scoping and quotes are free and I answer within one business day.
-
-### Commercial use of this repo
-
-This repo has **no license file**, which in copyright law means *all rights reserved*.
-Personal use, learning and open-source forks: go ahead, just link back. Shipping it inside a
-commercial or closed-source product needs a license — **$2,500** for one product, **$9,500**
-company-wide and perpetual, signed and issued the same day
-([details](https://p32929.github.io/hire/)).
+<a href="https://p32929.github.io/support/"><img src="https://p32929.github.io/readme/support.svg" alt="If you like my works and want to support me, feel free to support" width="420"></a>
